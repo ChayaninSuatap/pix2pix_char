@@ -5,8 +5,10 @@ from keras.layers.advanced_activations import LeakyReLU
 from keras.models import Model
 from keras.optimizers import Adam
 import numpy as np
-from dataset_util import make_dataset_generator
+from dataset_util import make_dataset_generator, load_sample_data
 import datetime
+import os
+import matplotlib.pyplot as plt
 
 def make_discriminator(img_x_shape, img_y_shape, dropout=0, init_filters_n=64):
 
@@ -91,7 +93,10 @@ def make_gan(img_x_shape, img_y_shape, dis_dropout, gen_dropout):
     
     return gan, gen, dis
 
-def train(gan, gen, dis, img_x_size, img_y_size, epochs, batch_size):
+def train(gan, gen, dis, img_x_size, img_y_size, epochs, batch_size,
+    init_epoch=1,
+    save_weights_each_epochs=1,
+    save_weights_path=''):
     start_time = datetime.datetime.now()
 
     patch = int(img_x_size[1] / 2**4)
@@ -99,7 +104,10 @@ def train(gan, gen, dis, img_x_size, img_y_size, epochs, batch_size):
     valid_label = np.ones((batch_size,) + disc_patch)
     fake_label = np.zeros((batch_size,) + disc_patch)
 
-    for epoch in range(epochs):
+    d_losses = []
+    g_losses = []
+
+    for epoch in range(init_epoch, epochs+1):
         batch_i = 0
         for x_imgs, y_imgs in make_dataset_generator(batch_size, img_x_size, img_y_size):
             batch_i += 1
@@ -109,6 +117,9 @@ def train(gan, gen, dis, img_x_size, img_y_size, epochs, batch_size):
             d_loss = 0.5 * np.add(d_loss_real, d_loss_fake)
             g_loss = gan.train_on_batch(x_imgs, [valid_label, y_imgs]) 
 
+            d_losses.append(d_loss[0])
+            g_losses.append(g_loss[0])
+
             elapsed_time = datetime.datetime.now() - start_time
 
             print('',end='\r')
@@ -117,8 +128,47 @@ def train(gan, gen, dis, img_x_size, img_y_size, epochs, batch_size):
                                                                         d_loss[0], 100*d_loss[1],
                                                                         g_loss[0],
                                                                         elapsed_time), end='')
+        #save weights
+        if epoch % save_weights_each_epochs == 0:
+            gen.save_weights(save_weights_path + 'gen.hdf5')
+            gen.save_weights(save_weights_path + 'gen.backup.hdf5')
+            dis.save_weights(save_weights_path + 'dis.hdf5')
+            dis.save_weights(save_weights_path + 'dis.backup.hdf5')
+            print('\nmodel saved')
+
+            plt.clf()
+            plt.plot(d_losses, label='discriminator')
+            plt.plot(g_losses, label='generator')
+            plt.legend(loc='best')
+            plt.title('epoch ' + str(epoch))
+            plt.savefig(save_weights_path + 'loss.png')
+
+            _sample_test(gen, img_x_size, epoch, save_weights_path)
+
+def _sample_test(gen, img_x_size, epoch=0, save_sample_plot_path=''):
+    x_imgs = load_sample_data(img_x_size)
+    preds = []
+    for x_img in x_imgs:
+        pred = gen.predict(np.asarray([x_img]).reshape(1,img_x_size[0], img_x_size[1], 1))
+        pred = pred * 0.5 + 0.5
+        preds.append(pred[0].reshape(img_x_size[0], img_x_size[1]))
+    
+    fig, axs = plt.subplots(2, len(x_imgs))
+
+    for i, pred in enumerate(preds):
+        axs[0, i].imshow(x_imgs[i] * 0.5 + 0.5, cmap='gray')
+        axs[1, i].imshow(pred, cmap='gray')
+        axs[0, i].axis('off')
+        axs[1, i].axis('off')
+    
+    fig.savefig(save_sample_plot_path = 'sample epoch %d.png' % (epoch,))
+    plt.close()
+
+
 
 if __name__ == '__main__':
     gan, gen, dis = make_gan(img_x_shape=(64, 64, 1), img_y_shape=(64, 64, 1),
         gen_dropout=0.2, dis_dropout=0.2)
-    train(gan, gen, dis, img_x_size=(64, 64), img_y_size=(64, 64), epochs=1, batch_size=1)
+    gen.load_weights('gen.hdf5')
+    _sample_test(gen, (64, 64))
+    # train(gan, gen, dis, img_x_size=(64, 64), img_y_size=(64, 64), epochs=5, batch_size=1)

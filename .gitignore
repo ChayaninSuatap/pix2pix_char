@@ -6,3 +6,9 @@ datasets/
 .vscode/
 
 __pycache__/
+
+*.hdf5
+
+*.png
+
+test/
