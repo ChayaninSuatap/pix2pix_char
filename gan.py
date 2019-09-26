@@ -68,7 +68,6 @@ def make_generator(img_y_shape, dropout=0, init_filters_n=64, channels=1):
     u7 = UpSampling2D(size=2)(u2)
     output_img = Conv2D(channels, kernel_size=4, strides=1, padding='same', activation='tanh')(u7)
     model = Model(d0, output_img)
-    model.summary()
     return model
 
 def make_gan(img_x_shape, img_y_shape, dis_dropout, gen_dropout):
@@ -166,7 +165,7 @@ def _sample_test(gen, img_x_size, epoch=0, save_sample_plot_path=''):
         axs[0, i].axis('off')
         axs[1, i].axis('off')
     
-    fig.savefig(save_sample_plot_path = 'sample epoch %d.png' % (epoch,))
+    fig.savefig(save_sample_plot_path + 'sample epoch %d.png' % (epoch,))
     plt.close()
 
 
@@ -174,6 +173,4 @@ def _sample_test(gen, img_x_size, epoch=0, save_sample_plot_path=''):
 if __name__ == '__main__':
     gan, gen, dis = make_gan(img_x_shape=(64, 64, 1), img_y_shape=(64, 64, 1),
         gen_dropout=0.2, dis_dropout=0.2)
-    gen.load_weights('gen.hdf5')
-    _sample_test(gen, (64, 64))
-    # train(gan, gen, dis, img_x_size=(64, 64), img_y_size=(64, 64), epochs=5, batch_size=1)
+    train(gan, gen, dis, img_x_size=(64, 64), img_y_size=(64, 64), epochs=5, batch_size=1)
