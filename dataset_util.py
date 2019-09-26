@@ -24,6 +24,8 @@ def make_dataset_generator(batch_size, img_x_resize=(40,40), img_y_resize=(40,40
         img = np.asarray(img) / 127.5 - 1
         label = int(fn[2:-4])
         x_imgs.append( (img, label))
+    
+    random.shuffle(x_imgs)
 
     y_imgs = []        
     for foldername in os.listdir(y_path):

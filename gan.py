@@ -96,6 +96,7 @@ def make_gan(img_x_shape, img_y_shape, dis_dropout, gen_dropout):
 def train(gan, gen, dis, img_x_size, img_y_size, epochs, batch_size,
     init_epoch=1,
     save_weights_each_epochs=1,
+    save_weights_checkpoint_each_epochs=5,
     save_weights_path=''):
     start_time = datetime.datetime.now()
 
@@ -144,6 +145,10 @@ def train(gan, gen, dis, img_x_size, img_y_size, epochs, batch_size,
             plt.savefig(save_weights_path + 'loss.png')
 
             _sample_test(gen, img_x_size, epoch, save_weights_path)
+        
+        if epoch % save_weights_checkpoint_each_epochs == 0:
+            gen.save_weights(save_weights_path + 'gen%d.hdf5' % (epoch))
+            dis.save_weights(save_weights_path + 'dis%d.hdf5' % (epoch))
 
 def _sample_test(gen, img_x_size, epoch=0, save_sample_plot_path=''):
     x_imgs = load_sample_data(img_x_size)
