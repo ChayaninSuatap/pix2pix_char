@@ -5,13 +5,16 @@ import numpy as np
 import random
 
 def load_sample_data(img_size):
-    output = []
+    imgs = []
+    labels = []
     for fn in os.listdir('test/sample_x'):
         img = Image.open('test/sample_x/' + fn)
         img = img.resize(img_size)
         img = np.asarray(img) / 127.5 - 1
-        output.append(img)
-    return output
+        label = int(fn[2:-4]) - 1
+        imgs.append(img)
+        labels.append(label)
+    return imgs, labels
 
 def make_dataset_generator(batch_size, img_x_resize=(40,40), img_y_resize=(40,40), use_label=False):
     x_path = 'datasets/x_chars/'

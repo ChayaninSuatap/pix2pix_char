@@ -9,6 +9,8 @@ from dataset_util import make_dataset_generator, load_sample_data
 import datetime
 import os
 import matplotlib.pyplot as plt
+from matplotlib.pyplot import rcParams
+rcParams['figure.figsize'] = 14, 8
 
 def make_discriminator(img_x_shape, img_y_shape, dropout=0, init_filters_n=64,
     use_label=False, label_embed_size=50, label_classes_n=None):
@@ -197,17 +199,21 @@ def train(gan, gen, dis, img_x_size, img_y_size, epochs, batch_size,
             plt.title('epoch ' + str(epoch))
             plt.savefig(save_weights_path + 'loss.png')
 
-            _sample_test(gen, img_x_size, epoch, save_weights_path)
+            _sample_test(gen, img_x_size, epoch, save_weights_path, use_label=use_label)
         
         if epoch % save_weights_checkpoint_each_epochs == 0:
             gen.save_weights(save_weights_path + 'gen%d.hdf5' % (epoch))
             dis.save_weights(save_weights_path + 'dis%d.hdf5' % (epoch))
 
-def _sample_test(gen, img_x_size, epoch=0, save_sample_plot_path=''):
-    x_imgs = load_sample_data(img_x_size)
+def _sample_test(gen, img_x_size, epoch=0, save_sample_plot_path='', use_label=False):
+    x_imgs, labels = load_sample_data(img_x_size)
     preds = []
-    for x_img in x_imgs:
-        pred = gen.predict(np.asarray([x_img]).reshape(1,img_x_size[0], img_x_size[1], 1))
+    for x_img, label in zip(x_imgs, labels):
+        reshaped = np.asarray([x_img]).reshape(1,img_x_size[0], img_x_size[1], 1)
+        if use_label:
+            pred = gen.predict([reshaped, np.asarray([label])])
+        elif not use_label:
+            pred = gen.predict(reshaped)
         pred = pred * 0.5 + 0.5
         preds.append(pred[0].reshape(img_x_size[0], img_x_size[1]))
     
