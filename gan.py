@@ -1,6 +1,6 @@
 import tensorflow as tf
 from keras.layers import Input, Conv2D, UpSampling2D, BatchNormalization, Dropout
-from keras.layers import Concatenate
+from keras.layers import Concatenate, Embedding, Dense, Reshape
 from keras.layers.advanced_activations import LeakyReLU
 from keras.models import Model
 from keras.optimizers import Adam
@@ -10,7 +10,8 @@ import datetime
 import os
 import matplotlib.pyplot as plt
 
-def make_discriminator(img_x_shape, img_y_shape, dropout=0, init_filters_n=64):
+def make_discriminator(img_x_shape, img_y_shape, dropout=0, init_filters_n=64,
+    use_label=False, label_embed_size=50, label_classes_n=None):
 
     def d_layer(layer_input, filters, f_size=4, bn=True, dropout_rate=0):
         d = Conv2D(filters, kernel_size=f_size, strides=2, padding='same')(layer_input)
@@ -21,19 +22,31 @@ def make_discriminator(img_x_shape, img_y_shape, dropout=0, init_filters_n=64):
             d = Dropout(dropout_rate)(d)
         return d
 
-    img_A = Input(shape=img_x_shape)
-    img_B = Input(shape=img_y_shape)
+    #input layer
+    img_X = Input(shape=img_x_shape)
+    img_Y = Input(shape=img_y_shape)
+    if use_label:
+        label_input_layer = Input(shape=(1,))
+        embed_layer = Embedding(label_classes_n, label_embed_size)(label_input_layer)
+        embed_dense_1d = Dense(img_y_shape[0] * img_y_shape[1])(embed_layer)
+        embed_dense_2d = Reshape((img_y_shape[0], img_y_shape[1], 1))(embed_dense_1d)
+        d0 = Concatenate()([img_X, img_Y, embed_dense_2d])
+    elif not use_label:
+        d0 = Concatenate()([img_X, img_Y])
 
-    combined_imgs = Concatenate(axis=-1)([img_A, img_B])
-
-    d1 = d_layer(combined_imgs, init_filters_n, bn = False, dropout_rate=dropout)
+    d1 = d_layer(d0, init_filters_n, bn = False, dropout_rate=dropout)
     d2 = d_layer(d1, init_filters_n * 2, dropout_rate=dropout)
     d3 = d_layer(d2, init_filters_n * 4, dropout_rate=dropout)
     d4 = d_layer(d3, init_filters_n * 8, dropout_rate=dropout)
     validity = Conv2D(1, kernel_size=4, strides=1, padding='same')(d4)
-    return Model([img_A, img_B], validity)
 
-def make_generator(img_y_shape, dropout=0, init_filters_n=64, channels=1):
+    if use_label:
+        return Model([img_X, img_Y, label_input_layer], validity)
+    else:
+        return Model([img_X, img_Y], validity)
+
+def make_generator(img_y_shape, dropout=0, init_filters_n=64, channels=1,
+    use_label=False, label_embed_size=50, label_classes_n=None):
     def conv2d(layer_input, filters, f_size=4, bn=True, dropout_rate=0):
         """Layers used during downsampling"""
         d = Conv2D(filters, kernel_size=f_size, strides=2, padding='same')(layer_input)
@@ -54,7 +67,15 @@ def make_generator(img_y_shape, dropout=0, init_filters_n=64, channels=1):
         u = Concatenate()([u, skip_input])
         return u
     # Image input
-    d0 = Input(shape=img_y_shape)
+    if use_label:
+        label_input_layer = Input(shape=(1,))
+        embed_layer = Embedding(label_classes_n, label_embed_size)(label_input_layer)
+        embed_dense_1d = Dense(img_y_shape[0] * img_y_shape[1])(embed_layer)
+        embed_dense_2d = Reshape((img_y_shape[0], img_y_shape[1], 1))(embed_dense_1d)
+        image_input_layer = Input(shape=img_y_shape)
+        d0 = Concatenate()([image_input_layer, embed_dense_2d])
+    elif not use_label:
+        d0 = Input(shape=img_y_shape)
 
     # Downsampling
     d1 = conv2d(d0, init_filters_n, bn=False, dropout_rate=dropout)
@@ -67,23 +88,42 @@ def make_generator(img_y_shape, dropout=0, init_filters_n=64, channels=1):
 
     u7 = UpSampling2D(size=2)(u2)
     output_img = Conv2D(channels, kernel_size=4, strides=1, padding='same', activation='tanh')(u7)
-    model = Model(d0, output_img)
+
+    if use_label:
+        model = Model([image_input_layer, label_input_layer], output_img)
+    else:
+        model = Model(d0, output_img)
     return model
 
-def make_gan(img_x_shape, img_y_shape, dis_dropout, gen_dropout):
+def make_gan(img_x_shape, img_y_shape, dis_dropout, gen_dropout,
+    use_label=False, label_embed_size=50, label_classes_n=None):
     optimizer = Adam(0.0002, 0.5)
 
-    dis = make_discriminator(img_x_shape, img_y_shape, dis_dropout)
+    dis = make_discriminator(img_x_shape, img_y_shape, dis_dropout,
+        use_label=use_label, label_embed_size=label_embed_size,
+        label_classes_n=label_classes_n)
     dis.compile(loss='mse',
         optimizer = optimizer,
         metrics=['accuracy'])
     
-    gen = make_generator(img_y_shape, gen_dropout)
-    x_input_layer = Input(shape=img_x_shape)
+    gen = make_generator(img_y_shape, gen_dropout,
+        use_label=use_label, label_embed_size=label_embed_size,
+        label_classes_n=label_classes_n)
+
+    image_input_layer = Input(shape=img_x_shape)
+    if use_label:
+        label_input_layer = Input(shape=(1,))
+        x_input_layer = [image_input_layer,label_input_layer]
+    else:
+        x_input_layer = image_input_layer
+    
     gen_output_layer = gen(x_input_layer)
 
     dis.trainable = False
-    dis_output_layer = dis([gen_output_layer, x_input_layer])
+    if use_label:
+        dis_output_layer = dis([image_input_layer, gen_output_layer, label_input_layer])
+    else:
+        dis_output_layer = dis([image_input_layer, gen_output_layer])
 
     gan = Model(inputs=x_input_layer, outputs=[dis_output_layer, gen_output_layer])
     gan.compile(loss=['mse', 'mae'],
@@ -93,6 +133,7 @@ def make_gan(img_x_shape, img_y_shape, dis_dropout, gen_dropout):
     return gan, gen, dis
 
 def train(gan, gen, dis, img_x_size, img_y_size, epochs, batch_size,
+    use_label=False,
     init_epoch=1,
     save_weights_each_epochs=1,
     save_weights_checkpoint_each_epochs=5,
@@ -109,13 +150,26 @@ def train(gan, gen, dis, img_x_size, img_y_size, epochs, batch_size,
 
     for epoch in range(init_epoch, epochs+1):
         batch_i = 0
-        for x_imgs, y_imgs in make_dataset_generator(batch_size, img_x_size, img_y_size):
+        for chrunk in make_dataset_generator(batch_size, img_x_size, img_y_size, use_label=use_label):
+            x_imgs = chrunk[0] 
+            y_imgs = chrunk[1]
+            if use_label:
+                class_labels = chrunk[2]
             batch_i += 1
-            gen_output = gen.predict(x_imgs)
-            d_loss_real = dis.train_on_batch([x_imgs, y_imgs], valid_label)
-            d_loss_fake = dis.train_on_batch([x_imgs, gen_output], fake_label)
+            if not use_label:
+                gen_output = gen.predict(x_imgs)
+                d_loss_real = dis.train_on_batch([x_imgs, y_imgs], valid_label)
+                d_loss_fake = dis.train_on_batch([x_imgs, gen_output], fake_label)
+            elif use_label:
+                gen_output = gen.predict([x_imgs, class_labels])
+                d_loss_real = dis.train_on_batch([x_imgs, y_imgs, class_labels], valid_label)
+                d_loss_fake = dis.train_on_batch([x_imgs, gen_output, class_labels], fake_label)
             d_loss = 0.5 * np.add(d_loss_real, d_loss_fake)
-            g_loss = gan.train_on_batch(x_imgs, [valid_label, y_imgs]) 
+            
+            if not use_label:
+                g_loss = gan.train_on_batch(x_imgs, [valid_label, y_imgs])
+            elif use_label:
+                g_loss = gan.train_on_batch([x_imgs, class_labels], [valid_label, y_imgs])
 
             d_losses.append(d_loss[0])
             g_losses.append(g_loss[0])
@@ -168,9 +222,11 @@ def _sample_test(gen, img_x_size, epoch=0, save_sample_plot_path=''):
     fig.savefig(save_sample_plot_path + 'sample epoch %d.png' % (epoch,))
     plt.close()
 
-
-
 if __name__ == '__main__':
     gan, gen, dis = make_gan(img_x_shape=(64, 64, 1), img_y_shape=(64, 64, 1),
+        use_label=True, label_classes_n=44,
         gen_dropout=0.2, dis_dropout=0.2)
-    train(gan, gen, dis, img_x_size=(64, 64), img_y_size=(64, 64), epochs=5, batch_size=1)
+    train(gan, gen, dis, img_x_size=(64, 64), img_y_size=(64, 64), 
+        use_label=True,
+        epochs=5, batch_size=1)
+        
