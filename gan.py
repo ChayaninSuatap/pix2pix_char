@@ -5,12 +5,13 @@ from keras.layers.advanced_activations import LeakyReLU
 from keras.models import Model
 from keras.optimizers import Adam
 import numpy as np
-from dataset_util import make_dataset_generator, load_sample_data
+from dataset_util import make_dataset_generator, load_sample_data, read_img
 import datetime
 import os
 import matplotlib.pyplot as plt
 from matplotlib.pyplot import rcParams
 from keras.utils import to_categorical
+from PIL import Image
 rcParams['figure.figsize'] = 14, 8
 
 def make_discriminator(img_x_shape, img_y_shape, dropout=0, init_filters_n=64,
@@ -240,11 +241,34 @@ def _sample_test(gen, img_x_size, epoch=0, save_sample_plot_path='', use_label=F
     fig.savefig(save_sample_plot_path + 'sample epoch %d.png' % (epoch,))
     plt.close()
 
+def predict(gen, img_size, x_path, y_path):
+    #load x files
+    x_imgs = []
+    for fn in os.listdir(x_path):
+        img = read_img(x_path + fn, img_size)
+        reshaped = np.asarray([img]).reshape(1, img_size[0], img_size[1], 1)
+        pred = gen.predict(reshaped)
+        pred = pred * 0.5 + 0.5
+        
+        # save to y_path
+        img = pred[0].reshape( img_size[0], img_size[1])
+        img = Image.fromarray(np.uint(img * 255))
+        save_fn = fn[:-4] + '.bmp'
+        img.convert('RGB').save(y_path + save_fn)
+
+
 if __name__ == '__main__':
-    gan, gen, dis = make_gan(img_x_shape=(64, 64, 1), img_y_shape=(64, 64, 1),
-        use_label=True, label_classes_n=44,
-        gen_dropout=0.2, dis_dropout=0.2)
-    train(gan, gen, dis, img_x_size=(64, 64), img_y_size=(64, 64), 
-        use_label=True,
-        epochs=5, batch_size=1)
+    # gan, gen, dis = make_gan(img_x_shape=(64, 64, 1), img_y_shape=(64, 64, 1),
+    #     use_label=True, label_classes_n=44,
+    #     gen_dropout=0.2, dis_dropout=0.2)
+    # train(gan, gen, dis, img_x_size=(64, 64), img_y_size=(64, 64), 
+    #     use_label=True,
+    #     epochs=5, batch_size=1)
+    gan, gen, dis = make_gan(img_x_shape=(128, 128, 1), img_y_shape=(128,128,1),
+    dis_dropout=0.2, gen_dropout=0.2, label_classes_n=44)
+    gen.load_weights('gen.hdf5')
+
+    predict(gen, img_size=(128,128), x_path='x_path/', y_path='y_path/')
+
+
         

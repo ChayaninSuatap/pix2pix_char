@@ -4,6 +4,12 @@ from PIL import Image
 import numpy as np
 import random
 
+def read_img(path, size):
+    img = Image.open(path)
+    img = img.resize(size)
+    img = np.asarray(img) / 127.5 - 1
+    return img
+
 def load_sample_data(img_size):
     imgs = []
     labels = []

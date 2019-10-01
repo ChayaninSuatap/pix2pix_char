@@ -14,3 +14,7 @@ __pycache__/
 test/
 
 *.zip
+
+y_path/
+
+x_path/
