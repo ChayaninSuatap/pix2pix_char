@@ -1,6 +1,6 @@
 import tensorflow as tf
 from keras.layers import Input, Conv2D, UpSampling2D, BatchNormalization, Dropout
-from keras.layers import Concatenate, Embedding, Dense, Reshape
+from keras.layers import Concatenate, Embedding, Dense, Reshape, Flatten
 from keras.layers.advanced_activations import LeakyReLU
 from keras.models import Model
 from keras.optimizers import Adam
@@ -10,6 +10,7 @@ import datetime
 import os
 import matplotlib.pyplot as plt
 from matplotlib.pyplot import rcParams
+from keras.utils import to_categorical
 rcParams['figure.figsize'] = 14, 8
 
 def make_discriminator(img_x_shape, img_y_shape, dropout=0, init_filters_n=64,
@@ -40,12 +41,17 @@ def make_discriminator(img_x_shape, img_y_shape, dropout=0, init_filters_n=64,
     d2 = d_layer(d1, init_filters_n * 2, dropout_rate=dropout)
     d3 = d_layer(d2, init_filters_n * 4, dropout_rate=dropout)
     d4 = d_layer(d3, init_filters_n * 8, dropout_rate=dropout)
+
+    flatten_layer = Flatten()(d4)
+    predict_class_layer = Dense(label_classes_n, activation='softmax', name='dense_classes')(flatten_layer)
     validity = Conv2D(1, kernel_size=4, strides=1, padding='same')(d4)
+    dis_output = [validity, predict_class_layer]
 
     if use_label:
-        return Model([img_X, img_Y, label_input_layer], validity)
+        model = Model([img_X, img_Y, label_input_layer], dis_output)
     else:
-        return Model([img_X, img_Y], validity)
+        model =  Model([img_X, img_Y], dis_output)
+    return model
 
 def make_generator(img_y_shape, dropout=0, init_filters_n=64, channels=1,
     use_label=False, label_embed_size=50, label_classes_n=None):
@@ -104,7 +110,7 @@ def make_gan(img_x_shape, img_y_shape, dis_dropout, gen_dropout,
     dis = make_discriminator(img_x_shape, img_y_shape, dis_dropout,
         use_label=use_label, label_embed_size=label_embed_size,
         label_classes_n=label_classes_n)
-    dis.compile(loss='mse',
+    dis.compile(loss=['mse', 'sparse_categorical_crossentropy'],
         optimizer = optimizer,
         metrics=['accuracy'])
     
@@ -122,14 +128,19 @@ def make_gan(img_x_shape, img_y_shape, dis_dropout, gen_dropout,
     gen_output_layer = gen(x_input_layer)
 
     dis.trainable = False
+
     if use_label:
         dis_output_layer = dis([image_input_layer, gen_output_layer, label_input_layer])
     else:
         dis_output_layer = dis([image_input_layer, gen_output_layer])
+    
+    validity_layer, pred_class_layer = dis_output_layer
+    gan_output_layer = [validity_layer, pred_class_layer, gen_output_layer]
 
-    gan = Model(inputs=x_input_layer, outputs=[dis_output_layer, gen_output_layer])
-    gan.compile(loss=['mse', 'mae'],
-        loss_weights=[1, 100],
+
+    gan = Model(inputs=x_input_layer, outputs=gan_output_layer)
+    gan.compile(loss=['mse', 'sparse_categorical_crossentropy', 'mae'],
+        loss_weights=[1, 1, 100],
         optimizer=optimizer)
     
     return gan, gen, dis
@@ -137,6 +148,7 @@ def make_gan(img_x_shape, img_y_shape, dis_dropout, gen_dropout,
 def train(gan, gen, dis, img_x_size, img_y_size, epochs, batch_size,
     use_label=False,
     init_epoch=1,
+    label_classes_n=44,
     save_weights_each_epochs=1,
     save_weights_checkpoint_each_epochs=5,
     save_weights_path=''):
@@ -160,18 +172,18 @@ def train(gan, gen, dis, img_x_size, img_y_size, epochs, batch_size,
             batch_i += 1
             if not use_label:
                 gen_output = gen.predict(x_imgs)
-                d_loss_real = dis.train_on_batch([x_imgs, y_imgs], valid_label)
-                d_loss_fake = dis.train_on_batch([x_imgs, gen_output], fake_label)
+                d_loss_real = dis.train_on_batch([x_imgs, y_imgs], [valid_label, class_labels])
+                d_loss_fake = dis.train_on_batch([x_imgs, gen_output], [fake_label, class_labels])
             elif use_label:
                 gen_output = gen.predict([x_imgs, class_labels])
-                d_loss_real = dis.train_on_batch([x_imgs, y_imgs, class_labels], valid_label)
-                d_loss_fake = dis.train_on_batch([x_imgs, gen_output, class_labels], fake_label)
+                d_loss_real = dis.train_on_batch([x_imgs, y_imgs, class_labels], [valid_label, class_labels])
+                d_loss_fake = dis.train_on_batch([x_imgs, gen_output, class_labels], [fake_label, class_labels])
             d_loss = 0.5 * np.add(d_loss_real, d_loss_fake)
             
             if not use_label:
-                g_loss = gan.train_on_batch(x_imgs, [valid_label, y_imgs])
+                g_loss = gan.train_on_batch(x_imgs, [valid_label, class_labels, y_imgs])
             elif use_label:
-                g_loss = gan.train_on_batch([x_imgs, class_labels], [valid_label, y_imgs])
+                g_loss = gan.train_on_batch([x_imgs, class_labels], [valid_label, class_labels, y_imgs])
 
             d_losses.append(d_loss[0])
             g_losses.append(g_loss[0])
@@ -179,9 +191,9 @@ def train(gan, gen, dis, img_x_size, img_y_size, epochs, batch_size,
             elapsed_time = datetime.datetime.now() - start_time
 
             print('',end='\r')
-            print ("[Epoch %d/%d] [Batch %d] [D loss: %f, acc: %3d%%] [G loss: %f] time: %s" % (epoch, epochs,
+            print ("[Epoch %d/%d] [Batch %d] [D loss: %f, judge_acc: %3d%%, classify_acc: %3d%% ] [G loss: %f] time: %s" % (epoch, epochs,
                                                                         batch_i,
-                                                                        d_loss[0], 100*d_loss[1],
+                                                                        d_loss[0], 100*d_loss[3], 100*d_loss[4],
                                                                         g_loss[0],
                                                                         elapsed_time), end='')
         #save weights
