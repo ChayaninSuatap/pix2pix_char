@@ -109,11 +109,11 @@ def make_generator(img_y_shape, dropout=0, init_filters_n=64, channels=1,
         model = Model(d0, output_img)
     return model
 
-def make_gan(img_x_shape, img_y_shape, dis_dropout, gen_dropout,
+def make_gan(img_x_shape, img_y_shape, init_filters_n=64, dis_dropout=0, gen_dropout=0,
     use_label=False, label_embed_size=50, label_classes_n=None, predict_class=False):
     optimizer = Adam(0.0002, 0.5)
 
-    dis = make_discriminator(img_x_shape, img_y_shape, dis_dropout,
+    dis = make_discriminator(img_x_shape, img_y_shape, dis_dropout, init_filters_n=init_filters_n,
         use_label=use_label, label_embed_size=label_embed_size,
         label_classes_n=label_classes_n, predict_class=predict_class)
     
@@ -124,7 +124,7 @@ def make_gan(img_x_shape, img_y_shape, dis_dropout, gen_dropout,
     else:
         dis.compile(loss='mse', optimizer=optimizer, metrics=['accuracy'])
     
-    gen = make_generator(img_y_shape, gen_dropout,
+    gen = make_generator(img_y_shape, gen_dropout, init_filters_n = init_filters_n,
         use_label=use_label, label_embed_size=label_embed_size,
         label_classes_n=label_classes_n)
 
@@ -290,7 +290,7 @@ def predict(gen, img_size, x_path, y_path):
 
 if __name__ == '__main__':
     dataset_cache = make_dataset_cache((64, 64), (64, 64))
-    gan, gen, dis = make_gan(img_x_shape=(64, 64, 1), img_y_shape=(64, 64, 1),
+    gan, gen, dis = make_gan(img_x_shape=(64, 64, 1), img_y_shape=(64, 64, 1), init_filters_n=256,
         # use_label=True, label_classes_n=44,
         gen_dropout=0.2, dis_dropout=0.2)
     train(dataset_cache, gan, gen, dis, img_x_size=(64, 64), img_y_size=(64, 64), 
