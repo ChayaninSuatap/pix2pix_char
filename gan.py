@@ -5,7 +5,7 @@ from keras.layers.advanced_activations import LeakyReLU
 from keras.models import Model
 from keras.optimizers import Adam
 import numpy as np
-from dataset_util import make_dataset_generator, load_sample_data, read_img
+from dataset_util import make_dataset_generator, load_sample_data, read_img, make_dataset_cache
 import datetime
 import os
 import matplotlib.pyplot as plt
@@ -162,7 +162,7 @@ def make_gan(img_x_shape, img_y_shape, dis_dropout, gen_dropout,
     
     return gan, gen, dis
 
-def train(gan, gen, dis, img_x_size, img_y_size, epochs, batch_size,
+def train(dataset_cache, gan, gen, dis, img_x_size, img_y_size, epochs, batch_size,
     use_label=False, predict_class=False,
     init_epoch=1,
     label_classes_n=44,
@@ -181,7 +181,7 @@ def train(gan, gen, dis, img_x_size, img_y_size, epochs, batch_size,
 
     for epoch in range(init_epoch, epochs+1):
         batch_i = 0
-        for chrunk in make_dataset_generator(batch_size, img_x_size, img_y_size, use_label=use_label):
+        for chrunk in make_dataset_generator(batch_size, dataset_cache, img_x_size, img_y_size, use_label=use_label):
             x_imgs = chrunk[0] 
             y_imgs = chrunk[1]
             if use_label:
@@ -288,12 +288,12 @@ def predict(gen, img_size, x_path, y_path):
         save_fn = fn[:-4] + '.bmp'
         img.convert('RGB').save(y_path + save_fn)
 
-
 if __name__ == '__main__':
+    dataset_cache = make_dataset_cache((64, 64), (64, 64))
     gan, gen, dis = make_gan(img_x_shape=(64, 64, 1), img_y_shape=(64, 64, 1),
         # use_label=True, label_classes_n=44,
         gen_dropout=0.2, dis_dropout=0.2)
-    train(gan, gen, dis, img_x_size=(64, 64), img_y_size=(64, 64), 
+    train(dataset_cache, gan, gen, dis, img_x_size=(64, 64), img_y_size=(64, 64), 
         # use_label=True,
         epochs=5, batch_size=1)
 

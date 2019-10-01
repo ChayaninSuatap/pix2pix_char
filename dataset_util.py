@@ -4,6 +4,8 @@ from PIL import Image
 import numpy as np
 import random
 from augment_util import augment
+
+
 def read_img(path, size):
     img = Image.open(path)
     img = img.resize(size)
@@ -22,7 +24,7 @@ def load_sample_data(img_size):
         labels.append(label)
     return imgs, labels
 
-def make_dataset_generator(batch_size, img_x_resize=(40,40), img_y_resize=(40,40), use_label=False):
+def make_dataset_cache(img_x_resize=(40,40), img_y_resize=(40,40)):
     x_path = 'datasets/x_chars/'
     y_path = 'datasets/y_chars/'
 
@@ -35,7 +37,6 @@ def make_dataset_generator(batch_size, img_x_resize=(40,40), img_y_resize=(40,40
         x_imgs.append( (img, label))
     
     random.shuffle(x_imgs)
-
     y_imgs = []        
     for foldername in os.listdir(y_path):
         for fn in os.listdir(y_path+foldername):
@@ -43,6 +44,13 @@ def make_dataset_generator(batch_size, img_x_resize=(40,40), img_y_resize=(40,40
             img = Image.open(y_path+foldername+'/'+fn)
             img = img.resize(img_y_resize)
             y_imgs.append( (img, label))
+
+    return x_imgs, y_imgs
+
+
+def make_dataset_generator(batch_size, dataset_cache, img_x_resize=(40,40), img_y_resize=(40,40), use_label=False):
+    x_imgs, y_imgs = dataset_cache 
+    random.shuffle(x_imgs)
 
     y_img_dict = {}
     for img, label in y_imgs:
