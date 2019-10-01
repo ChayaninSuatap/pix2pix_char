@@ -15,7 +15,7 @@ from PIL import Image
 rcParams['figure.figsize'] = 14, 8
 
 def make_discriminator(img_x_shape, img_y_shape, dropout=0, init_filters_n=64,
-    use_label=False, label_embed_size=50, label_classes_n=None):
+    use_label=False, label_embed_size=50, label_classes_n=None, predict_class=False):
 
     def d_layer(layer_input, filters, f_size=4, bn=True, dropout_rate=0):
         d = Conv2D(filters, kernel_size=f_size, strides=2, padding='same')(layer_input)
@@ -43,10 +43,15 @@ def make_discriminator(img_x_shape, img_y_shape, dropout=0, init_filters_n=64,
     d3 = d_layer(d2, init_filters_n * 4, dropout_rate=dropout)
     d4 = d_layer(d3, init_filters_n * 8, dropout_rate=dropout)
 
-    flatten_layer = Flatten()(d4)
-    predict_class_layer = Dense(label_classes_n, activation='softmax', name='dense_classes')(flatten_layer)
     validity = Conv2D(1, kernel_size=4, strides=1, padding='same')(d4)
-    dis_output = [validity, predict_class_layer]
+
+    if predict_class:
+        flatten_layer = Flatten()(d4)
+        predict_class_layer = Dense(label_classes_n, activation='softmax', name='dense_classes')(flatten_layer)
+        dis_output = [validity, predict_class_layer]
+    else:
+        dis_output = validity
+
 
     if use_label:
         model = Model([img_X, img_Y, label_input_layer], dis_output)
@@ -105,15 +110,19 @@ def make_generator(img_y_shape, dropout=0, init_filters_n=64, channels=1,
     return model
 
 def make_gan(img_x_shape, img_y_shape, dis_dropout, gen_dropout,
-    use_label=False, label_embed_size=50, label_classes_n=None):
+    use_label=False, label_embed_size=50, label_classes_n=None, predict_class=False):
     optimizer = Adam(0.0002, 0.5)
 
     dis = make_discriminator(img_x_shape, img_y_shape, dis_dropout,
         use_label=use_label, label_embed_size=label_embed_size,
-        label_classes_n=label_classes_n)
-    dis.compile(loss=['mse', 'sparse_categorical_crossentropy'],
-        optimizer = optimizer,
-        metrics=['accuracy'])
+        label_classes_n=label_classes_n, predict_class=predict_class)
+    
+    if predict_class:
+        dis.compile(loss=['mse', 'sparse_categorical_crossentropy'],
+            optimizer = optimizer,
+            metrics=['accuracy'])
+    else:
+        dis.compile(loss='mse', optimizer=optimizer, metrics=['accuracy'])
     
     gen = make_generator(img_y_shape, gen_dropout,
         use_label=use_label, label_embed_size=label_embed_size,
@@ -135,19 +144,26 @@ def make_gan(img_x_shape, img_y_shape, dis_dropout, gen_dropout,
     else:
         dis_output_layer = dis([image_input_layer, gen_output_layer])
     
-    validity_layer, pred_class_layer = dis_output_layer
-    gan_output_layer = [validity_layer, pred_class_layer, gen_output_layer]
-
+    if predict_class:
+        validity_layer, pred_class_layer = dis_output_layer
+        gan_output_layer = [validity_layer, pred_class_layer, gen_output_layer]
+        gan_loss = ['mse', 'sparse_categorical_crossentropy', 'mae']
+        gan_loss_weights = [1, 1, 100]
+    else:
+        validity_layer = dis_output_layer
+        gan_output_layer = [validity_layer, gen_output_layer]
+        gan_loss = ['mse', 'mae']
+        gan_loss_weights = [1, 100]
 
     gan = Model(inputs=x_input_layer, outputs=gan_output_layer)
-    gan.compile(loss=['mse', 'sparse_categorical_crossentropy', 'mae'],
-        loss_weights=[1, 1, 100],
+    gan.compile(loss=gan_loss,
+        loss_weights=gan_loss_weights,
         optimizer=optimizer)
     
     return gan, gen, dis
 
 def train(gan, gen, dis, img_x_size, img_y_size, epochs, batch_size,
-    use_label=False,
+    use_label=False, predict_class=False,
     init_epoch=1,
     label_classes_n=44,
     save_weights_each_epochs=1,
@@ -171,20 +187,28 @@ def train(gan, gen, dis, img_x_size, img_y_size, epochs, batch_size,
             if use_label:
                 class_labels = chrunk[2]
             batch_i += 1
+
+            if predict_class:
+                dis_y_valid = [valid_label, class_labels]
+                dis_y_fake = [fake_label, class_labels]
+            else:
+                dis_y_valid = valid_label
+                dis_y_fake = fake_label
+
             if not use_label:
                 gen_output = gen.predict(x_imgs)
-                d_loss_real = dis.train_on_batch([x_imgs, y_imgs], [valid_label, class_labels])
-                d_loss_fake = dis.train_on_batch([x_imgs, gen_output], [fake_label, class_labels])
+                d_loss_real = dis.train_on_batch([x_imgs, y_imgs], dis_y_valid)
+                d_loss_fake = dis.train_on_batch([x_imgs, gen_output], dis_y_fake)
             elif use_label:
                 gen_output = gen.predict([x_imgs, class_labels])
-                d_loss_real = dis.train_on_batch([x_imgs, y_imgs, class_labels], [valid_label, class_labels])
-                d_loss_fake = dis.train_on_batch([x_imgs, gen_output, class_labels], [fake_label, class_labels])
+                d_loss_real = dis.train_on_batch([x_imgs, y_imgs, class_labels], dis_y_valid)
+                d_loss_fake = dis.train_on_batch([x_imgs, gen_output, class_labels], dis_y_fake)
             d_loss = 0.5 * np.add(d_loss_real, d_loss_fake)
             
             if not use_label:
-                g_loss = gan.train_on_batch(x_imgs, [valid_label, class_labels, y_imgs])
+                g_loss = gan.train_on_batch(x_imgs, [valid_label, class_labels, y_imgs] if predict_class else [valid_label, y_imgs])
             elif use_label:
-                g_loss = gan.train_on_batch([x_imgs, class_labels], [valid_label, class_labels, y_imgs])
+                g_loss = gan.train_on_batch([x_imgs, class_labels], [valid_label, class_labels, y_imgs] if predict_class else [valid_label, y_imgs])
 
             d_losses.append(d_loss[0])
             g_losses.append(g_loss[0])
@@ -192,9 +216,17 @@ def train(gan, gen, dis, img_x_size, img_y_size, epochs, batch_size,
             elapsed_time = datetime.datetime.now() - start_time
 
             print('',end='\r')
-            print ("[Epoch %d/%d] [Batch %d] [D loss: %f, judge_acc: %3d%%, classify_acc: %3d%% ] [G loss: %f] time: %s" % (epoch, epochs,
+
+            if predict_class:
+                print ("[Epoch %d/%d] [Batch %d] [D loss: %f, judge_acc: %3d%%, classify_acc: %3d%% ] [G loss: %f] time: %s" % (epoch, epochs,
                                                                         batch_i,
                                                                         d_loss[0], 100*d_loss[3], 100*d_loss[4],
+                                                                        g_loss[0],
+                                                                        elapsed_time), end='')
+            else:
+                print ("[Epoch %d/%d] [Batch %d] [D loss: %f, acc: %3d%%] [G loss: %f] time: %s" % (epoch, epochs,
+                                                                        batch_i,
+                                                                        d_loss[0], 100*d_loss[1],
                                                                         g_loss[0],
                                                                         elapsed_time), end='')
         #save weights
@@ -258,17 +290,18 @@ def predict(gen, img_size, x_path, y_path):
 
 
 if __name__ == '__main__':
-    # gan, gen, dis = make_gan(img_x_shape=(64, 64, 1), img_y_shape=(64, 64, 1),
-    #     use_label=True, label_classes_n=44,
-    #     gen_dropout=0.2, dis_dropout=0.2)
-    # train(gan, gen, dis, img_x_size=(64, 64), img_y_size=(64, 64), 
-    #     use_label=True,
-    #     epochs=5, batch_size=1)
-    gan, gen, dis = make_gan(img_x_shape=(128, 128, 1), img_y_shape=(128,128,1),
-    dis_dropout=0.2, gen_dropout=0.2, label_classes_n=44)
-    gen.load_weights('gen.hdf5')
+    gan, gen, dis = make_gan(img_x_shape=(64, 64, 1), img_y_shape=(64, 64, 1),
+        # use_label=True, label_classes_n=44,
+        gen_dropout=0.2, dis_dropout=0.2)
+    train(gan, gen, dis, img_x_size=(64, 64), img_y_size=(64, 64), 
+        # use_label=True,
+        epochs=5, batch_size=1)
 
-    predict(gen, img_size=(128,128), x_path='x_path/', y_path='y_path/')
+    # gan, gen, dis = make_gan(img_x_shape=(128, 128, 1), img_y_shape=(128,128,1),
+    # dis_dropout=0.2, gen_dropout=0.2, label_classes_n=44)
+    # gen.load_weights('gen.hdf5')
+
+    # predict(gen, img_size=(128,128), x_path='x_path/', y_path='y_path/')
 
 
         
