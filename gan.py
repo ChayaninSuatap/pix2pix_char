@@ -162,12 +162,12 @@ def make_gan(img_x_shape, img_y_shape, init_filters_n=64, dis_dropout=0, gen_dro
         validity_layer, pred_class_layer = dis_output_layer
         gan_output_layer = [validity_layer, pred_class_layer, gen_output_layer]
         gan_loss = [dis_validity_loss, 'sparse_categorical_crossentropy', 'mae']
-        gan_loss_weights = [1, 1, 100]
+        gan_loss_weights = [0, 0, 100]
     else:
         validity_layer = dis_output_layer
         gan_output_layer = [validity_layer, gen_output_layer]
         gan_loss = [dis_validity_loss, 'mae']
-        gan_loss_weights = [1, 100]
+        gan_loss_weights = [0, 100]
 
     gan = Model(inputs=x_input_layer, outputs=gan_output_layer)
     gan.compile(loss=gan_loss,

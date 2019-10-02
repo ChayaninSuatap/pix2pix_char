@@ -21,9 +21,9 @@ def augment(x_img, y_img, img_x_resize, img_y_resize):
     if random.randint(0, 1) == 0:
         x_img = flip_up_down(x_img)
         y_img = flip_up_down(y_img)
-    angle = random.randint(0, 360)
-    x_img = rotate(x_img, angle).resize(img_x_resize)
-    y_img = rotate(y_img, angle).resize(img_y_resize)
+    # angle = random.randint(0, 360)
+    # x_img = rotate(x_img, angle).resize(img_x_resize)
+    # y_img = rotate(y_img, angle).resize(img_y_resize)
 
     return x_img, y_img
 
