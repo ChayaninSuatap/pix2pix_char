@@ -72,7 +72,7 @@ def make_dataset_generator(batch_size, dataset_cache, img_x_resize=(40,40), img_
 
         #augment
         x_img , y_img = augment(x_img, y_img, img_x_resize, img_y_resize)
-        #asarray to normalize
+       #asarray to normalize
         x_img = np.asarray(x_img) / 127.5 - 1
         y_img = np.asarray(y_img) / 127.5 - 1
         
