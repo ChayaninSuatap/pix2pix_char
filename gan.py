@@ -15,7 +15,8 @@ from PIL import Image
 rcParams['figure.figsize'] = 14, 8
 
 def make_discriminator(img_x_shape, img_y_shape, dropout=0, init_filters_n=64,
-    use_label=False, label_embed_size=50, label_classes_n=None, predict_class=False):
+    use_label=False, label_embed_size=50, label_classes_n=None, predict_class=False,
+    filter_size=4):
 
     def d_layer(layer_input, filters, f_size=4, bn=True, dropout_rate=0):
         d = Conv2D(filters, kernel_size=f_size, strides=2, padding='same')(layer_input)
@@ -38,10 +39,10 @@ def make_discriminator(img_x_shape, img_y_shape, dropout=0, init_filters_n=64,
     elif not use_label:
         d0 = Concatenate()([img_X, img_Y])
 
-    d1 = d_layer(d0, init_filters_n, bn = False, dropout_rate=dropout)
-    d2 = d_layer(d1, init_filters_n * 2, dropout_rate=dropout)
-    d3 = d_layer(d2, init_filters_n * 4, dropout_rate=dropout)
-    d4 = d_layer(d3, init_filters_n * 8, dropout_rate=dropout)
+    d1 = d_layer(d0, init_filters_n, f_size=filter_size, bn = False, dropout_rate=dropout)
+    d2 = d_layer(d1, init_filters_n * 2, f_size=filter_size,  dropout_rate=dropout)
+    d3 = d_layer(d2, init_filters_n * 4, f_size=filter_size, dropout_rate=dropout)
+    d4 = d_layer(d3, init_filters_n * 8, f_size=filter_size, dropout_rate=dropout)
 
     validity = Conv2D(1, kernel_size=4, strides=1, padding='same')(d4)
 
@@ -60,7 +61,7 @@ def make_discriminator(img_x_shape, img_y_shape, dropout=0, init_filters_n=64,
     return model
 
 def make_generator(img_y_shape, dropout=0, init_filters_n=64, channels=1,
-    use_label=False, label_embed_size=50, label_classes_n=None):
+    use_label=False, label_embed_size=50, label_classes_n=None, filter_size=4):
     def conv2d(layer_input, filters, f_size=4, bn=True, dropout_rate=0):
         """Layers used during downsampling"""
         d = Conv2D(filters, kernel_size=f_size, strides=2, padding='same')(layer_input)
@@ -92,16 +93,18 @@ def make_generator(img_y_shape, dropout=0, init_filters_n=64, channels=1,
         d0 = Input(shape=img_y_shape)
 
     # Downsampling
-    d1 = conv2d(d0, init_filters_n, bn=False, dropout_rate=dropout)
-    d2 = conv2d(d1, init_filters_n*2, dropout_rate=dropout)
-    d3 = conv2d(d2, init_filters_n*4, dropout_rate=dropout)
+    d1 = conv2d(d0, init_filters_n, f_size=filter_size, bn=False, dropout_rate=dropout)
+    d2 = conv2d(d1, init_filters_n*2, f_size=filter_size,  dropout_rate=dropout)
+    d3 = conv2d(d2, init_filters_n*4, f_size=filter_size, dropout_rate=dropout)
+    d4 = conv2d(d3, init_filters_n*8, f_size=filter_size, dropout_rate=dropout)
 
     # Upsampling
-    u1 = deconv2d(d3, d2, init_filters_n*4, dropout_rate=dropout)
-    u2 = deconv2d(u1, d1, init_filters_n*2, dropout_rate=dropout)
+    u1 = deconv2d(d4, d3, init_filters_n*8, f_size=filter_size, dropout_rate=dropout)
+    u2 = deconv2d(u1, d2, init_filters_n*4, f_size=filter_size, dropout_rate=dropout)
+    u3 = deconv2d(u2, d1, init_filters_n*2, f_size=filter_size, dropout_rate=dropout)
 
-    u7 = UpSampling2D(size=2)(u2)
-    output_img = Conv2D(channels, kernel_size=4, strides=1, padding='same', activation='tanh')(u7)
+    u7 = UpSampling2D(size=2)(u3)
+    output_img = Conv2D(channels, kernel_size=filter_size, strides=1, padding='same', activation='tanh')(u7)
 
     if use_label:
         model = Model([image_input_layer, label_input_layer], output_img)
@@ -110,7 +113,8 @@ def make_generator(img_y_shape, dropout=0, init_filters_n=64, channels=1,
     return model
 
 def make_gan(img_x_shape, img_y_shape, init_filters_n=64, dis_dropout=0, gen_dropout=0,
-    use_label=False, label_embed_size=50, label_classes_n=None, predict_class=False):
+    use_label=False, label_embed_size=50, label_classes_n=None, predict_class=False,
+    filter_size=4):
     optimizer = Adam(0.0002, 0.5)
 
     dis = make_discriminator(img_x_shape, img_y_shape, dis_dropout, init_filters_n=init_filters_n,
@@ -126,7 +130,7 @@ def make_gan(img_x_shape, img_y_shape, init_filters_n=64, dis_dropout=0, gen_dro
     
     gen = make_generator(img_y_shape, gen_dropout, init_filters_n = init_filters_n,
         use_label=use_label, label_embed_size=label_embed_size,
-        label_classes_n=label_classes_n)
+        label_classes_n=label_classes_n, filter_size=filter_size)
 
     image_input_layer = Input(shape=img_x_shape)
     if use_label:
@@ -290,7 +294,7 @@ def predict(gen, img_size, x_path, y_path):
 
 if __name__ == '__main__':
     dataset_cache = make_dataset_cache((64, 64), (64, 64))
-    gan, gen, dis = make_gan(img_x_shape=(64, 64, 1), img_y_shape=(64, 64, 1), init_filters_n=256,
+    gan, gen, dis = make_gan(img_x_shape=(64, 64, 1), img_y_shape=(64, 64, 1),
         # use_label=True, label_classes_n=44,
         gen_dropout=0.2, dis_dropout=0.2)
     train(dataset_cache, gan, gen, dis, img_x_size=(64, 64), img_y_size=(64, 64), 

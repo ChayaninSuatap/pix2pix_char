@@ -29,5 +29,7 @@ def augment(x_img, y_img, img_x_resize, img_y_resize):
 
 if __name__ == '__main__':
     img = Image.open('x_path/4_1.jpg')
-    img = rotate(img)
+    img = rotate(img, 59)
+
     img.show()
+    input()
