@@ -322,7 +322,7 @@ def train(dataset_cache, gan, gen, dis, img_x_size, img_y_size, epochs, batch_si
             dis.save_weights(save_weights_path + 'dis.backup.hdf5')
             print('\nmodel saved')
 
-            _sample_test(gen, img_x_size, epoch, save_weights_path, use_label=use_label)
+            _sample_test(gen, img_x_size, epoch, save_weights_path, use_label=use_label, invert_color=invert_color)
         
         if epoch % save_weights_checkpoint_each_epochs == 0:
             gen.save_weights(save_weights_path + 'gen%d.hdf5' % (epoch))
