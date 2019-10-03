@@ -46,7 +46,7 @@ def make_discriminator(img_x_shape, img_y_shape, dropout=0, init_filters_n=64,
     d4 = d_layer(d3, init_filters_n * 8, f_size=filter_size, dropout_rate=dropout)
 
     if not use_binary_validity:
-        validity = Conv2D(1, kernel_size=4, strides=1, padding='same')(d4)
+        validity = Conv2D(1, kernel_size=4, activation='sigmoid', strides=1, padding='same')(d4)
     else:
         flatten_layer = Flatten()(d4)
         validity = Dense(1, activation='sigmoid', name='dis_valid_binary')(flatten_layer)
@@ -179,9 +179,9 @@ def make_gan(img_x_shape, img_y_shape, init_filters_n=64, dis_dropout=0, gen_dro
     if predict_class:
         dis.compile(loss=[dis_validity_loss, 'sparse_categorical_crossentropy'],
             optimizer = optimizer,
-            metrics=['accuracy'])
+            metrics=['accuracy'], loss_weights=[0.5])
     else:
-        dis.compile(loss=dis_validity_loss, optimizer=optimizer, metrics=['accuracy'])
+        dis.compile(loss=dis_validity_loss, optimizer=optimizer, metrics=['accuracy'], loss_weights=[0.5])
     
     if not use_generator2:
         gen = make_generator(img_y_shape, gen_dropout, init_filters_n = init_filters_n,
@@ -343,9 +343,10 @@ def _sample_test(gen, img_x_size, epoch=0, save_sample_plot_path='', use_label=F
     fig, axs = plt.subplots(2, len(x_imgs))
 
     for i, pred in enumerate(preds):
-        img_to_show = x_img[i] * 0.5 + 0.5
+        img_to_show = x_imgs[i] * 0.5 + 0.5
         if invert_color:
-            img_to_show = 1 - img_to_show
+            img_to_show = 1. - img_to_show
+
         axs[0, i].imshow(img_to_show, cmap='gray')
         axs[1, i].imshow(pred, cmap='gray')
         axs[0, i].axis('off')
@@ -378,7 +379,7 @@ if __name__ == '__main__':
     # gen.load_weights('gen.hdf5')
     # dis.load_weights('dis.hdf5')
 
-    train(dataset_cache, gan, gen, dis, img_x_size=(128, 128), img_y_size=(128, 128),  use_binary_validity=False, init_epoch=34,
+    train(dataset_cache, gan, gen, dis, img_x_size=(128, 128), img_y_size=(128, 128),  use_binary_validity=False, init_epoch=1,
         epochs=9999, batch_size=1, save_weights_each_epochs=1, save_weights_checkpoint_each_epochs=9999, invert_color=True)
 
 
