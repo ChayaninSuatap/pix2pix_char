@@ -1,30 +1,34 @@
 import os
 import matplotlib.pyplot as plt
-from PIL import Image
+from PIL import Image, ImageOps
 import numpy as np
 import random
 from augment_util import augment
 
 
-def read_img(path, size):
+def read_img(path, size, invert_color=False):
     img = Image.open(path)
     img = img.resize(size)
+    if invert_color:
+        img = ImageOps.invert(img)
     img = np.asarray(img) / 127.5 - 1
     return img
 
-def load_sample_data(img_size):
+def load_sample_data(img_size, invert_color=False):
     imgs = []
     labels = []
     for fn in os.listdir('test/sample_x'):
         img = Image.open('test/sample_x/' + fn)
         img = img.resize(img_size)
+        if invert_color:
+            img = ImageOps.invert(img)
         img = np.asarray(img) / 127.5 - 1
         label = int(fn[2:-4]) - 1
         imgs.append(img)
         labels.append(label)
     return imgs, labels
 
-def make_dataset_cache(img_x_resize=(40,40), img_y_resize=(40,40)):
+def make_dataset_cache(img_x_resize=(40,40), img_y_resize=(40,40), invert_color=False):
     x_path = 'datasets/x_chars/'
     y_path = 'datasets/y_chars/'
 
@@ -33,6 +37,8 @@ def make_dataset_cache(img_x_resize=(40,40), img_y_resize=(40,40)):
     for fn in os.listdir(x_path):
         img = Image.open(x_path + fn)
         img = img.resize(img_x_resize)
+        if invert_color:
+            img = ImageOps.invert(img)
         label = int(fn[2:-4]) - 1
         x_imgs.append( (img, label))
     
@@ -43,12 +49,14 @@ def make_dataset_cache(img_x_resize=(40,40), img_y_resize=(40,40)):
             label = int(foldername) - 1
             img = Image.open(y_path+foldername+'/'+fn)
             img = img.resize(img_y_resize)
+            if invert_color:
+                img = ImageOps.invert(img)
             y_imgs.append( (img, label))
 
     return x_imgs, y_imgs
 
 
-def make_dataset_generator(batch_size, dataset_cache, img_x_resize=(40,40), img_y_resize=(40,40), use_label=False):
+def make_dataset_generator(batch_size, dataset_cache, img_x_resize=(40,40), img_y_resize=(40,40), use_label=False, invert_color=False):
     x_imgs, y_imgs = dataset_cache 
     random.shuffle(x_imgs)
 
@@ -71,7 +79,11 @@ def make_dataset_generator(batch_size, dataset_cache, img_x_resize=(40,40), img_
         y_img = y_img_dict[label][y_img_i]
 
         #augment
-        x_img , y_img = augment(x_img, y_img, img_x_resize, img_y_resize)
+        x_img , y_img = augment(x_img, y_img, img_x_resize, img_y_resize, invert_color=invert_color)
+        # x_img.show()
+        # y_img.show()
+        # input()
+
        #asarray to normalize
         x_img = np.asarray(x_img) / 127.5 - 1
         y_img = np.asarray(y_img) / 127.5 - 1
@@ -95,7 +107,7 @@ def make_dataset_generator(batch_size, dataset_cache, img_x_resize=(40,40), img_
 
 if __name__ == '__main__':
     count = 0
-    for x_imgs, y_imgs in make_dataset_generator(32):
+    for x_imgs, y_imgs in make_dataset_generator(32, make_dataset_cache(invert_color=True), invert_color=True):
         count+= len(x_imgs)
     print(count)
 
