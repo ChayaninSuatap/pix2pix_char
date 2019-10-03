@@ -121,7 +121,8 @@ def make_generator(img_y_shape, dropout=0, init_filters_n=64, channels=1,
 
 def make_gan(img_x_shape, img_y_shape, init_filters_n=64, dis_dropout=0, gen_dropout=0,
     use_label=False, label_embed_size=50, label_classes_n=None, predict_class=False,
-    filter_size=4, use_binary_validity=False, binary_validity_dropout_rate=0):
+    filter_size=4, use_binary_validity=False, binary_validity_dropout_rate=0,
+    gan_loss_weights=None):
     optimizer = Adam(0.0002, 0.5)
 
     dis = make_discriminator(img_x_shape, img_y_shape, dis_dropout, init_filters_n=init_filters_n,
@@ -162,12 +163,14 @@ def make_gan(img_x_shape, img_y_shape, init_filters_n=64, dis_dropout=0, gen_dro
         validity_layer, pred_class_layer = dis_output_layer
         gan_output_layer = [validity_layer, pred_class_layer, gen_output_layer]
         gan_loss = [dis_validity_loss, 'sparse_categorical_crossentropy', 'mae']
-        gan_loss_weights = [0, 0, 100]
+        if gan_loss_weights is None:
+            gan_loss_weights = [0, 0, 100]
     else:
         validity_layer = dis_output_layer
         gan_output_layer = [validity_layer, gen_output_layer]
         gan_loss = [dis_validity_loss, 'mae']
-        gan_loss_weights = [0, 100]
+        if gan_loss_weights is None:
+            gan_loss_weights = [0, 100]
 
     gan = Model(inputs=x_input_layer, outputs=gan_output_layer)
     gan.compile(loss=gan_loss,
@@ -191,10 +194,12 @@ def train(dataset_cache, gan, gen, dis, img_x_size, img_y_size, epochs, batch_si
     valid_label = np.ones((batch_size, 1)) if use_binary_validity else np.ones((batch_size,) + disc_patch)
     fake_label = np.zeros((batch_size, 1)) if use_binary_validity else np.zeros((batch_size,) + disc_patch)
 
-    d_losses = []
-    g_losses = []
+    d_loss_avgs = []
+    g_loss_avgs = []
 
     for epoch in range(init_epoch, epochs+1):
+        d_losses = []
+        g_losses = []
         batch_i = 0
         for chrunk in make_dataset_generator(batch_size, dataset_cache, img_x_size, img_y_size, use_label=use_label):
             x_imgs = chrunk[0] 
@@ -248,6 +253,20 @@ def train(dataset_cache, gan, gen, dis, img_x_size, img_y_size, epochs, batch_si
                                                                         d_loss[0], 100*d_loss[1],
                                                                         g_loss[0],
                                                                         elapsed_time), end='')
+
+        #end of epoch
+        d_loss_avg = np.asarray(d_losses).mean()
+        g_loss_avg = np.asarray(g_losses).mean()
+        d_loss_avgs.append(d_loss_avg)
+        g_loss_avgs.append(g_loss_avg)
+        #plot loss
+        plt.clf()
+        plt.plot(d_loss_avgs, label='discriminator')
+        plt.plot(g_loss_avgs, label='generator')
+        plt.legend(loc='best')
+        plt.title('epoch ' + str(epoch))
+        plt.savefig(save_weights_path + 'loss.png')
+
         #save weights
         if epoch % save_weights_each_epochs == 0:
             gen.save_weights(save_weights_path + 'gen.hdf5')
@@ -255,13 +274,6 @@ def train(dataset_cache, gan, gen, dis, img_x_size, img_y_size, epochs, batch_si
             dis.save_weights(save_weights_path + 'dis.hdf5')
             dis.save_weights(save_weights_path + 'dis.backup.hdf5')
             print('\nmodel saved')
-
-            plt.clf()
-            plt.plot(d_losses, label='discriminator')
-            plt.plot(g_losses, label='generator')
-            plt.legend(loc='best')
-            plt.title('epoch ' + str(epoch))
-            plt.savefig(save_weights_path + 'loss.png')
 
             _sample_test(gen, img_x_size, epoch, save_weights_path, use_label=use_label)
         
@@ -311,11 +323,10 @@ if __name__ == '__main__':
     dataset_cache = make_dataset_cache((64, 64), (64, 64))
     gan, gen, dis = make_gan(img_x_shape=(64, 64, 1), img_y_shape=(64, 64, 1),
         # use_label=True, label_classes_n=44,
-        gen_dropout=0.2, dis_dropout=0.2, use_binary_validity=True, binary_validity_dropout_rate=.35)
-    dis.summary()
+        gen_dropout=0, dis_dropout=0, use_binary_validity=True, binary_validity_dropout_rate=.35, gan_loss_weights=[1,1])
     train(dataset_cache, gan, gen, dis, img_x_size=(64, 64), img_y_size=(64, 64),  use_binary_validity=True,
         # use_label=True,
-        epochs=5, batch_size=1)
+        epochs=100, batch_size=1)
 
     # gan, gen, dis = make_gan(img_x_shape=(128, 128, 1), img_y_shape=(128,128,1),
     # dis_dropout=0.2, gen_dropout=0.2, label_classes_n=44)
