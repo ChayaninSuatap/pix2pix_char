@@ -101,14 +101,14 @@ def make_generator(img_y_shape, dropout=0, init_filters_n=64, channels=1,
 
     # Downsampling
     d1 = conv2d(d0, init_filters_n, f_size=filter_size, bn=False, dropout_rate=dropout)
-    d2 = conv2d(d1, init_filters_n*2, f_size=filter_size,  dropout_rate=dropout)
+    d2 = conv2d(d1, init_filters_n*2, f_size=filter_size, dropout_rate=dropout)
     d3 = conv2d(d2, init_filters_n*4, f_size=filter_size, dropout_rate=dropout)
     d4 = conv2d(d3, init_filters_n*8, f_size=filter_size, dropout_rate=dropout)
 
     # Upsampling
-    u1 = deconv2d(d4, d3, init_filters_n*8, f_size=filter_size, dropout_rate=dropout)
-    u2 = deconv2d(u1, d2, init_filters_n*4, f_size=filter_size, dropout_rate=dropout)
-    u3 = deconv2d(u2, d1, init_filters_n*2, f_size=filter_size, dropout_rate=dropout)
+    u1 = deconv2d(d4, d3, init_filters_n*4, f_size=filter_size, dropout_rate=dropout)
+    u2 = deconv2d(u1, d2, init_filters_n*2, f_size=filter_size, dropout_rate=dropout)
+    u3 = deconv2d(u2, d1, init_filters_n  , f_size=filter_size, dropout_rate=dropout)
 
     u7 = UpSampling2D(size=2)(u3)
     output_img = Conv2D(channels, kernel_size=filter_size, strides=1, padding='same', activation='tanh')(u7)
@@ -164,13 +164,13 @@ def make_gan(img_x_shape, img_y_shape, init_filters_n=64, dis_dropout=0, gen_dro
         gan_output_layer = [validity_layer, pred_class_layer, gen_output_layer]
         gan_loss = [dis_validity_loss, 'sparse_categorical_crossentropy', 'mae']
         if gan_loss_weights is None:
-            gan_loss_weights = [0, 0, 100]
+            gan_loss_weights = [1, 1, 100]
     else:
         validity_layer = dis_output_layer
         gan_output_layer = [validity_layer, gen_output_layer]
         gan_loss = [dis_validity_loss, 'mae']
         if gan_loss_weights is None:
-            gan_loss_weights = [0, 100]
+            gan_loss_weights = [1, 100]
 
     gan = Model(inputs=x_input_layer, outputs=gan_output_layer)
     gan.compile(loss=gan_loss,
@@ -320,19 +320,32 @@ def predict(gen, img_size, x_path, y_path):
         img.convert('RGB').save(y_path + save_fn)
 
 if __name__ == '__main__':
-    dataset_cache = make_dataset_cache((64, 64), (64, 64))
-    gan, gen, dis = make_gan(img_x_shape=(64, 64, 1), img_y_shape=(64, 64, 1),
-        # use_label=True, label_classes_n=44,
-        gen_dropout=0, dis_dropout=0, use_binary_validity=True, binary_validity_dropout_rate=.35, gan_loss_weights=[1,1])
-    train(dataset_cache, gan, gen, dis, img_x_size=(64, 64), img_y_size=(64, 64),  use_binary_validity=True,
-        # use_label=True,
-        epochs=100, batch_size=1)
+    dataset_cache = make_dataset_cache((128, 128), (128, 128))
+    # gan, gen, dis = make_gan(img_x_shape=(128, 128, 1), img_y_shape=(128, 128, 1),
+    #     # use_label=True, label_classes_n=44,
+    #     gen_dropout=0, dis_dropout=0, use_binary_validity=True, binary_validity_dropout_rate=.35)
+
+#     gan, gen, dis = make_gan(img_x_shape=(128, 128, 1), img_y_shape=(128, 128, 1), init_filters_n = 256, filter_size=4,
+#       use_binary_validity = True, binary_validity_dropout_rate = 0.35,
+# #       use_label=True, label_classes_n=44,
+#       gen_dropout=0, dis_dropout=0)
+
+    gan, gen, dis = make_gan(img_x_shape=(128, 128, 1), img_y_shape=(128, 128, 1), init_filters_n = 128, filter_size=4,
+#       use_binary_validity = True, binary_validity_dropout_rate = 0.35,
+#       use_label=True, label_classes_n=44,
+      gen_dropout=0, dis_dropout=0)
+
+    gen.load_weights('gen128.hdf5')
+
+    # train(dataset_cache, gan, gen, dis, img_x_size=(128, 128), img_y_size=(128, 128),  use_binary_validity=True,
+    #     # use_label=True,
+    #     epochs=100, batch_size=1)
 
     # gan, gen, dis = make_gan(img_x_shape=(128, 128, 1), img_y_shape=(128,128,1),
     # dis_dropout=0.2, gen_dropout=0.2, label_classes_n=44)
     # gen.load_weights('gen.hdf5')
 
-    # predict(gen, img_size=(128,128), x_path='x_path/', y_path='y_path/')
+    predict(gen, img_size=(128,128), x_path='x_path/', y_path='y_path/')
 
 
         
