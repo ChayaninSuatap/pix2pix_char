@@ -337,16 +337,13 @@ def _sample_test(gen, img_x_size, epoch=0, save_sample_plot_path='', use_label=F
             pred = gen.predict([reshaped, np.asarray([label])])
         elif not use_label:
             pred = gen.predict(reshaped)
-        pred = pred * 0.5 + 0.5
+        pred = 1 - (pred * 0.5 + 0.5) if invert_color else (pred * 0.5 - 0.5)
         preds.append(pred[0].reshape(img_x_size[0], img_x_size[1]))
     
     fig, axs = plt.subplots(2, len(x_imgs))
 
     for i, pred in enumerate(preds):
         img_to_show = x_imgs[i] * 0.5 + 0.5
-        if invert_color:
-            img_to_show = 1. - img_to_show
-
         axs[0, i].imshow(img_to_show, cmap='gray')
         axs[1, i].imshow(pred, cmap='gray')
         axs[0, i].axis('off')
