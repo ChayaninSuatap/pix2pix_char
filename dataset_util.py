@@ -56,7 +56,7 @@ def make_dataset_cache(img_x_resize=(40,40), img_y_resize=(40,40), invert_color=
     return x_imgs, y_imgs
 
 
-def make_dataset_generator(batch_size, dataset_cache, img_x_resize=(40,40), img_y_resize=(40,40), use_label=False, invert_color=False):
+def make_dataset_generator(batch_size, dataset_cache, img_x_resize=(40,40), img_y_resize=(40,40), use_label=False, invert_color=False, augment=True):
     x_imgs, y_imgs = dataset_cache 
     random.shuffle(x_imgs)
 
@@ -79,7 +79,8 @@ def make_dataset_generator(batch_size, dataset_cache, img_x_resize=(40,40), img_
         y_img = y_img_dict[label][y_img_i]
 
         #augment
-        x_img , y_img = augment(x_img, y_img, img_x_resize, img_y_resize, invert_color=invert_color)
+        if augment:
+            x_img , y_img = augment(x_img, y_img, img_x_resize, img_y_resize, invert_color=invert_color)
         # x_img.show()
         # y_img.show()
         # input()
