@@ -68,7 +68,37 @@ def make_discriminator(img_x_shape, img_y_shape, dropout=0, init_filters_n=64,
         model =  Model([img_X, img_Y], dis_output)
     return model
 
-def make_generator2(img_shape, init_filters_n=64):
+def make_discriminator2(img_x_shape, img_y_shape, init_filters_n=64):
+    def conv2d(layer_in, filters, f_size=4, bn=True):
+        ly = Conv2D(filters, f_size, strides=(2,2), padding='same', kernel_initializer=init)(layer_in)
+        if bn:
+            ly = BatchNormalization()(ly)
+        ly = LeakyReLU(alpha=0.2)(ly)
+        return ly
+
+    #input layer
+    init = RandomNormal(stddev=0.02)
+    input_x_layer = Input(shape=img_x_shape)
+    input_y_layer = Input(shape=img_y_shape)
+    input_merged_layer = Concatenate()([input_x_layer, input_y_layer])
+
+    #conv
+    ly = conv2d(input_merged_layer, init_filters_n, bn=False)
+    ly = conv2d(ly, init_filters_n * 2)
+    ly = conv2d(ly, init_filters_n * 4)
+    ly = conv2d(ly, init_filters_n * 8)
+
+    #second last layer
+    ly = Conv2D(init_filters_n * 8, (4,4), padding='same', kernel_initializer=init)(ly)
+    ly = BatchNormalization()(ly)
+    ly = LeakyReLU(alpha=0.2)(ly)
+
+    #patch output
+    ly = Conv2D(1, (4,4), activation='sigmoid', padding='same', kernel_initializer=init)(ly)
+
+    return Model([input_x_layer, input_y_layer], ly)
+
+def make_generator2(img_shape, init_filters_n=64, dropout_rate=None):
     init = RandomNormal(stddev=0.02)
 
     def encoder(layer_in, filters, f_size=4, bn=True):
@@ -101,15 +131,14 @@ def make_generator2(img_shape, init_filters_n=64):
     #decoder
     d1 = decoder(b, e4, init_filters_n * 8)
     d2 = decoder(d1, e3, init_filters_n *4)
-    d3 = decoder(d2, e2, init_filters_n *2)
-    d4 = decoder(d3, e1, init_filters_n)
+    d3 = decoder(d2, e2, init_filters_n *2, dropout_rate=dropout_rate)
+    d4 = decoder(d3, e1, init_filters_n, dropout_rate=dropout_rate)
 
     #output
     o = Conv2DTranspose(1, (4,4), strides=(2,2), padding='same', kernel_initializer=init)(d4)
     o = Activation('tanh')(o)        
 
     return Model(input_layer, o)
-                
 
 def make_generator(img_y_shape, dropout=0, init_filters_n=64, channels=1,
     use_label=False, label_embed_size=50, label_classes_n=None, filter_size=4):
@@ -166,15 +195,18 @@ def make_generator(img_y_shape, dropout=0, init_filters_n=64, channels=1,
 def make_gan(img_x_shape, img_y_shape, init_filters_n=64, dis_dropout=0, gen_dropout=0,
     use_label=False, label_embed_size=50, label_classes_n=None, predict_class=False,
     filter_size=4, use_binary_validity=False, binary_validity_dropout_rate=0,
-    gan_loss_weights=None, use_generator2=False):
+    gan_loss_weights=None, use_generator2=False, use_discriminator2=False):
     optimizer = Adam(0.0002, 0.5)
 
-    dis = make_discriminator(img_x_shape, img_y_shape, dis_dropout, init_filters_n=init_filters_n,
-        use_label=use_label, label_embed_size=label_embed_size,
-        label_classes_n=label_classes_n, predict_class=predict_class,
-        use_binary_validity=use_binary_validity, binary_validity_dropout_rate=binary_validity_dropout_rate)
+    if not use_discriminator2:
+        dis = make_discriminator(img_x_shape, img_y_shape, dis_dropout, init_filters_n=init_filters_n,
+            use_label=use_label, label_embed_size=label_embed_size,
+            label_classes_n=label_classes_n, predict_class=predict_class,
+            use_binary_validity=use_binary_validity, binary_validity_dropout_rate=binary_validity_dropout_rate)
+    else:
+        dis = make_discriminator2(img_x_shape, img_y_shape, init_filters_n=init_filters_n)
     
-    dis_validity_loss = 'binary_crossentropy' if use_binary_validity else 'mse'
+    dis_validity_loss = 'binary_crossentropy'
 
     if predict_class:
         dis.compile(loss=[dis_validity_loss, 'sparse_categorical_crossentropy'],
@@ -183,12 +215,13 @@ def make_gan(img_x_shape, img_y_shape, init_filters_n=64, dis_dropout=0, gen_dro
     else:
         dis.compile(loss=dis_validity_loss, optimizer=optimizer, metrics=['accuracy'], loss_weights=[0.5])
     
+    #generator
     if not use_generator2:
         gen = make_generator(img_y_shape, gen_dropout, init_filters_n = init_filters_n,
             use_label=use_label, label_embed_size=label_embed_size,
             label_classes_n=label_classes_n, filter_size=filter_size)
     else:
-        gen = make_generator2(img_y_shape, init_filters_n=init_filters_n)
+        gen = make_generator2(img_y_shape, init_filters_n=init_filters_n, dropout_rate=gen_dropout)
 
     image_input_layer = Input(shape=img_x_shape)
     if use_label:
@@ -215,7 +248,7 @@ def make_gan(img_x_shape, img_y_shape, init_filters_n=64, dis_dropout=0, gen_dro
     else:
         validity_layer = dis_output_layer
         gan_output_layer = [validity_layer, gen_output_layer]
-        gan_loss = [dis_validity_loss, 'mse']
+        gan_loss = [dis_validity_loss, 'mae']
         if gan_loss_weights is None:
             gan_loss_weights = [1, 100]
 
@@ -368,16 +401,17 @@ def predict(gen, img_size, x_path, y_path, invert_color=False):
         img.convert('RGB').save(y_path + save_fn)
 
 if __name__ == '__main__':
-    dataset_cache = make_dataset_cache((128, 128), (128, 128), invert_color=True)
+    dataset_cache = make_dataset_cache((128, 128), (128, 128))
 
-    gan, gen, dis = make_gan(img_x_shape=(128, 128, 1), img_y_shape=(128, 128, 1), init_filters_n = 64, filter_size=4, use_generator2=True,
-      gen_dropout=0, dis_dropout=0, gan_loss_weights=[0, 1])
+    gan, gen, dis = make_gan(img_x_shape=(128, 128, 1), img_y_shape=(128, 128, 1), init_filters_n = 64, filter_size=4,
+      use_generator2=True, use_discriminator2=True,
+      gen_dropout=0.5, dis_dropout=0, gan_loss_weights=[1, 100])
 
     # gen.load_weights('gen.hdf5')
     # dis.load_weights('dis.hdf5')
 
-    train(dataset_cache, gan, gen, dis, img_x_size=(128, 128), img_y_size=(128, 128),  use_binary_validity=False, init_epoch=1,
-        epochs=9999, batch_size=1, save_weights_each_epochs=1, save_weights_checkpoint_each_epochs=9999, invert_color=True)
+    train(dataset_cache, gan, gen, dis, img_x_size=(128, 128), img_y_size=(128, 128), init_epoch=1,
+        epochs=9999, batch_size=1, save_weights_each_epochs=1, save_weights_checkpoint_each_epochs=9999)
 
 
     # predict(gen, img_size=(128,128), x_path='x_path/', y_path='y_path/')
