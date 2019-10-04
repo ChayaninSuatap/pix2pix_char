@@ -376,7 +376,7 @@ def _sample_test(gen, img_x_size, epoch=0, save_sample_plot_path='', use_label=F
     fig, axs = plt.subplots(2, len(x_imgs))
 
     for i, pred in enumerate(preds):
-        img_to_show = x_imgs[i] * 0.5 + 0.5
+        img_to_show = 1 - (x_imgs[i] * 0.5 + 0.5) if invert_color else x_imgs[i] * 0.5 + 0.5
         axs[0, i].imshow(img_to_show, cmap='gray')
         axs[1, i].imshow(pred, cmap='gray')
         axs[0, i].axis('off')
