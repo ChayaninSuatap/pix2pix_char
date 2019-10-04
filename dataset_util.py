@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 from PIL import Image, ImageOps
 import numpy as np
 import random
-from augment_util import augment
+from augment_util import augment_img
 
 
 def read_img(path, size, invert_color=False):
@@ -55,7 +55,6 @@ def make_dataset_cache(img_x_resize=(40,40), img_y_resize=(40,40), invert_color=
 
     return x_imgs, y_imgs
 
-
 def make_dataset_generator(batch_size, dataset_cache, img_x_resize=(40,40), img_y_resize=(40,40), use_label=False, invert_color=False, augment=True):
     x_imgs, y_imgs = dataset_cache 
     random.shuffle(x_imgs)
@@ -80,7 +79,7 @@ def make_dataset_generator(batch_size, dataset_cache, img_x_resize=(40,40), img_
 
         #augment
         if augment:
-            x_img , y_img = augment(x_img, y_img, img_x_resize, img_y_resize, invert_color=invert_color)
+            x_img , y_img = augment_img(x_img, y_img, img_x_resize, img_y_resize, invert_color=invert_color)
         # x_img.show()
         # y_img.show()
         # input()

@@ -16,7 +16,7 @@ def rotate(img, angle, invert_color=False):
         img = ImageOps.invert(img)
     return img
 
-def augment(x_img, y_img, img_x_resize, img_y_resize, invert_color=False):
+def augment_img(x_img, y_img, img_x_resize, img_y_resize, invert_color=False):
     if random.randint(0, 1) == 0:
         x_img = flip_left_right(x_img)
         y_img = flip_left_right(y_img)
