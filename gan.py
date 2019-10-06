@@ -195,16 +195,19 @@ def make_generator(img_y_shape, dropout=0, init_filters_n=64, channels=1,
 def make_gan(img_x_shape, img_y_shape, init_filters_n=64, dis_dropout=0, gen_dropout=0,
     use_label=False, label_embed_size=50, label_classes_n=None, predict_class=False,
     filter_size=4, use_binary_validity=False, binary_validity_dropout_rate=0,
-    gan_loss_weights=None, use_generator2=False, use_discriminator2=False):
+    gan_loss_weights=None, use_generator2=False, use_discriminator2=False,
+    gen_init_filters_n=None, dis_init_filters_n=None):
     optimizer = Adam(0.0002, 0.5)
 
+    #discriminator
+    dis_filters = dis_init_filters_n if dis_init_filters_n is not None else init_filters_n
     if not use_discriminator2:
-        dis = make_discriminator(img_x_shape, img_y_shape, dis_dropout, init_filters_n=init_filters_n,
+        dis = make_discriminator(img_x_shape, img_y_shape, dis_dropout, init_filters_n=dis_filters,
             use_label=use_label, label_embed_size=label_embed_size,
             label_classes_n=label_classes_n, predict_class=predict_class,
             use_binary_validity=use_binary_validity, binary_validity_dropout_rate=binary_validity_dropout_rate)
     else:
-        dis = make_discriminator2(img_x_shape, img_y_shape, init_filters_n=init_filters_n)
+        dis = make_discriminator2(img_x_shape, img_y_shape, init_filters_n=dis_filters)
     
     dis_validity_loss = 'binary_crossentropy'
 
@@ -216,12 +219,13 @@ def make_gan(img_x_shape, img_y_shape, init_filters_n=64, dis_dropout=0, gen_dro
         dis.compile(loss=dis_validity_loss, optimizer=optimizer, metrics=['accuracy'], loss_weights=[0.5])
     
     #generator
+    gen_filters = gen_init_filters_n if gen_init_filters_n is not None else init_filters_n
     if not use_generator2:
-        gen = make_generator(img_y_shape, gen_dropout, init_filters_n = init_filters_n,
+        gen = make_generator(img_y_shape, gen_dropout, init_filters_n = gen_filters,
             use_label=use_label, label_embed_size=label_embed_size,
             label_classes_n=label_classes_n, filter_size=filter_size)
     else:
-        gen = make_generator2(img_y_shape, init_filters_n=init_filters_n, dropout_rate=gen_dropout)
+        gen = make_generator2(img_y_shape, init_filters_n=gen_filters, dropout_rate=gen_dropout)
 
     image_input_layer = Input(shape=img_x_shape)
     if use_label:
