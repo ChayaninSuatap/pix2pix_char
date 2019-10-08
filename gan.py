@@ -13,6 +13,7 @@ from matplotlib.pyplot import rcParams
 from keras.utils import to_categorical
 from keras.initializers import RandomNormal
 from PIL import Image
+import random
 rcParams['figure.figsize'] = 14, 8
 
 def make_discriminator(img_x_shape, img_y_shape, dropout=0, init_filters_n=64,
@@ -265,7 +266,7 @@ def make_gan(img_x_shape, img_y_shape, init_filters_n=64, dis_dropout=0, gen_dro
 
 def train(dataset_cache, gan, gen, dis, img_x_size, img_y_size, epochs, batch_size,
     use_label=False, predict_class=False, use_binary_validity=False, invert_color=False,
-    label_classes_n=44, augment=True, scale=False,
+    label_classes_n=44, augment=True, scale=False, noisy_label=False,
     init_epoch=1,
     save_weights_each_epochs=1,
     save_weights_checkpoint_each_epochs=5,
@@ -293,6 +294,16 @@ def train(dataset_cache, gan, gen, dis, img_x_size, img_y_size, epochs, batch_si
                 class_labels = chrunk[2]
             batch_i += 1
 
+            #train with noisy label
+            if noisy_label:
+                #make fake 0.8 - 1, valid = 0.0 - 0.2
+                valid_label = np.full((batch_size, ) + disc_patch, random.uniform(0.0, 0.2))
+                fake_label = np.full((batch_size, ) + disc_patch, random.uniform(0.8, 1.0))
+                #20%chance to flip
+                if random.uniform(0.0,1.0) > 0.8:
+                    valid_label, fake_label = fake_label, valid_label
+
+            #set up if predict class
             if predict_class:
                 dis_y_valid = [valid_label, class_labels]
                 dis_y_fake = [fake_label, class_labels]
@@ -408,14 +419,15 @@ def predict(gen, img_size, x_path, y_path, invert_color=False):
 if __name__ == '__main__':
     dataset_cache = make_dataset_cache((128, 128), (128, 128))
 
-    gan, gen, dis = make_gan(img_x_shape=(128, 128, 1), img_y_shape=(128, 128, 1), init_filters_n = 128, filter_size=4,
+    gan, gen, dis = make_gan(img_x_shape=(128, 128, 1), img_y_shape=(128, 128, 1), init_filters_n = 64, filter_size=4,
         use_generator2=True, use_discriminator2=True,
         gen_dropout=0.5, dis_dropout=0, gan_loss_weights=[1, 100])
 
     # gen.load_weights('gen.hdf5')
     # dis.load_weights('dis.hdf5')
 
-    train(dataset_cache, gan, gen, dis, img_x_size=(128, 128), img_y_size=(128, 128), init_epoch=1, augment=True, scale=True,
+    train(dataset_cache, gan, gen, dis, img_x_size=(128, 128), img_y_size=(128, 128), init_epoch=1, noisy_label=True,
+        augment=True, scale=True,
         epochs=9999, batch_size=1, save_weights_each_epochs=1, save_weights_checkpoint_each_epochs=9999)
 
 
