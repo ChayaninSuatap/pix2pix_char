@@ -265,7 +265,7 @@ def make_gan(img_x_shape, img_y_shape, init_filters_n=64, dis_dropout=0, gen_dro
 
 def train(dataset_cache, gan, gen, dis, img_x_size, img_y_size, epochs, batch_size,
     use_label=False, predict_class=False, use_binary_validity=False, invert_color=False,
-    label_classes_n=44, augment=True, scale=False
+    label_classes_n=44, augment=True, scale=False,
     init_epoch=1,
     save_weights_each_epochs=1,
     save_weights_checkpoint_each_epochs=5,
@@ -412,11 +412,11 @@ if __name__ == '__main__':
         use_generator2=True, use_discriminator2=True,
         gen_dropout=0.5, dis_dropout=0, gan_loss_weights=[1, 100])
 
-    gen.load_weights('gen.hdf5')
+    # gen.load_weights('gen.hdf5')
     # dis.load_weights('dis.hdf5')
 
-    # train(dataset_cache, gan, gen, dis, img_x_size=(128, 128), img_y_size=(128, 128), init_epoch=1, augment=False,
-        # epochs=9999, batch_size=1, save_weights_each_epochs=1, save_weights_checkpoint_each_epochs=9999)
+    train(dataset_cache, gan, gen, dis, img_x_size=(128, 128), img_y_size=(128, 128), init_epoch=1, augment=True, scale=True,
+        epochs=9999, batch_size=1, save_weights_each_epochs=1, save_weights_checkpoint_each_epochs=9999)
 
 
     predict(gen, img_size=(128,128), x_path='x_path/', y_path='y_path/', invert_color=True)
