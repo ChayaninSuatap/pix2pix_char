@@ -57,7 +57,8 @@ def make_dataset_cache(img_x_resize=(40,40), img_y_resize=(40,40), invert_color=
 
     return x_imgs, y_imgs
 
-def make_dataset_generator(batch_size, dataset_cache, img_x_resize=(40,40), img_y_resize=(40,40), use_label=False, invert_color=False, augment=True):
+def make_dataset_generator(batch_size, dataset_cache, img_x_resize=(40,40), img_y_resize=(40,40), use_label=False,
+    invert_color=False, augment=True, scale=True):
     x_imgs, y_imgs = dataset_cache 
     random.shuffle(x_imgs)
 
@@ -109,7 +110,8 @@ def make_dataset_generator(batch_size, dataset_cache, img_x_resize=(40,40), img_
 
 if __name__ == '__main__':
     count = 0
-    for x_imgs, y_imgs in make_dataset_generator(32, make_dataset_cache(invert_color=True), invert_color=True):
+    cache = make_dataset_cache(img_x_resize=(64,64), img_y_resize=(64,64), invert_color=True)
+    for x_imgs, y_imgs in make_dataset_generator(32, cache, img_x_resize=(64,64), img_y_resize=(64,64), invert_color=True, scale=True):
         count+= len(x_imgs)
     print(count)
 

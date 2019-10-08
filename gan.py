@@ -265,7 +265,7 @@ def make_gan(img_x_shape, img_y_shape, init_filters_n=64, dis_dropout=0, gen_dro
 
 def train(dataset_cache, gan, gen, dis, img_x_size, img_y_size, epochs, batch_size,
     use_label=False, predict_class=False, use_binary_validity=False, invert_color=False,
-    label_classes_n=44, augment=True,
+    label_classes_n=44, augment=True, scale=False
     init_epoch=1,
     save_weights_each_epochs=1,
     save_weights_checkpoint_each_epochs=5,
@@ -285,7 +285,8 @@ def train(dataset_cache, gan, gen, dis, img_x_size, img_y_size, epochs, batch_si
         d_losses = []
         g_losses = []
         batch_i = 0
-        for chrunk in make_dataset_generator(batch_size, dataset_cache, img_x_size, img_y_size, use_label=use_label, invert_color=invert_color, augment=augment):
+        for chrunk in make_dataset_generator(batch_size, dataset_cache, img_x_size, img_y_size, use_label=use_label,
+            invert_color=invert_color, augment=augment, scale=scale):
             x_imgs = chrunk[0] 
             y_imgs = chrunk[1]
             if use_label:
