@@ -5,13 +5,15 @@ import numpy as np
 import random
 from augment_util import augment_img
 
-
 def read_img(path, size, invert_color=False):
     img = Image.open(path)
     img = img.resize(size)
+    # if invert_color:
+        # img = ImageOps.invert(img)
+    img = np.asarray(img)
     if invert_color:
-        img = ImageOps.invert(img)
-    img = np.asarray(img) / 127.5 - 1
+        img = 255 - img
+    img = img / 127.5 - 1
     return img
 
 def load_sample_data(img_size, invert_color=False):

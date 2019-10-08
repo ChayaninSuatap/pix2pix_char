@@ -393,7 +393,7 @@ def predict(gen, img_size, x_path, y_path, invert_color=False):
     #load x files
     x_imgs = []
     for fn in os.listdir(x_path):
-        img = read_img(x_path + fn, img_size)
+        img = read_img(x_path + fn, img_size, invert_color=invert_color)
         reshaped = np.asarray([img]).reshape(1, img_size[0], img_size[1], 1)
         pred = gen.predict(reshaped)
         pred = 1-(pred * 0.5 + 0.5) if invert_color else (pred * 0.5 + 0.5)
@@ -407,18 +407,18 @@ def predict(gen, img_size, x_path, y_path, invert_color=False):
 if __name__ == '__main__':
     dataset_cache = make_dataset_cache((128, 128), (128, 128))
 
-    gan, gen, dis = make_gan(img_x_shape=(128, 128, 1), img_y_shape=(128, 128, 1), init_filters_n = 64, filter_size=4,
-      use_generator2=True, use_discriminator2=True,
-      gen_dropout=0.5, dis_dropout=0, gan_loss_weights=[1, 100])
+    gan, gen, dis = make_gan(img_x_shape=(128, 128, 1), img_y_shape=(128, 128, 1), init_filters_n = 128, filter_size=4,
+        use_generator2=True, use_discriminator2=True,
+        gen_dropout=0.5, dis_dropout=0, gan_loss_weights=[1, 100])
 
-    # gen.load_weights('gen.hdf5')
+    gen.load_weights('gen.hdf5')
     # dis.load_weights('dis.hdf5')
 
-    train(dataset_cache, gan, gen, dis, img_x_size=(128, 128), img_y_size=(128, 128), init_epoch=1, augment=False,
-        epochs=9999, batch_size=1, save_weights_each_epochs=1, save_weights_checkpoint_each_epochs=9999)
+    # train(dataset_cache, gan, gen, dis, img_x_size=(128, 128), img_y_size=(128, 128), init_epoch=1, augment=False,
+        # epochs=9999, batch_size=1, save_weights_each_epochs=1, save_weights_checkpoint_each_epochs=9999)
 
 
-    # predict(gen, img_size=(128,128), x_path='x_path/', y_path='y_path/')
+    predict(gen, img_size=(128,128), x_path='x_path/', y_path='y_path/', invert_color=True)
 
 
         
