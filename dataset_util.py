@@ -58,7 +58,7 @@ def make_dataset_cache(img_x_resize=(40,40), img_y_resize=(40,40), invert_color=
     return x_imgs, y_imgs
 
 def make_dataset_generator(batch_size, dataset_cache, img_x_resize=(40,40), img_y_resize=(40,40), use_label=False,
-    invert_color=False, augment=True, scale=True):
+    invert_color=False, augment=True, scale=False):
     x_imgs, y_imgs = dataset_cache 
     random.shuffle(x_imgs)
 
@@ -82,7 +82,7 @@ def make_dataset_generator(batch_size, dataset_cache, img_x_resize=(40,40), img_
 
         #augment
         if augment:
-            x_img , y_img = augment_img(x_img, y_img, img_x_resize, img_y_resize, invert_color=invert_color)
+            x_img , y_img = augment_img(x_img, y_img, img_x_resize, img_y_resize, invert_color=invert_color, scale=scale)
         # x_img.show()
         # y_img.show()
         # input()
@@ -108,11 +108,40 @@ def make_dataset_generator(batch_size, dataset_cache, img_x_resize=(40,40), img_
             if x_img_i == len(x_imgs):
                 break
 
+def make_x_scale(sample_fn, save_path, img_x_resize):
+    from augment_util import rotate
+    import random
+
+    for angle in range(0, 360, 30):
+        for scale_factor in range(5,12):
+            x_img = Image.open(sample_fn)
+            x_img = rotate(x_img, angle ).resize(img_x_resize)
+            if scale_factor == 10:
+                continue
+            scale_factor /= 10
+            scale_size = (int(img_x_resize[0] * scale_factor), int(img_x_resize[1] * scale_factor))
+            scaled_patch_x = x_img.resize(scale_size)
+
+            #create empty image
+            x_img= Image.new('L', img_x_resize,  (255,))
+
+            if scale_factor >= 1:
+                x_pos = random.randrange(0, scaled_patch_x.width - x_img.width)
+                y_pos = random.randrange(0, scaled_patch_x.width - x_img.width)
+                x_img = scaled_patch_x.crop((x_pos, y_pos, x_img.width+x_pos, x_img.width+y_pos))
+
+            else: #random position to paste
+                x_pos = random.randrange(0, x_img.width - scaled_patch_x.width)
+                y_pos = random.randrange(0, x_img.width - scaled_patch_x.width)
+                x_img.paste(scaled_patch_x, (x_pos, y_pos))
+                x_img.save(save_path+'/%.1f_%d.bmp' %(scale_factor, angle) )
+
 if __name__ == '__main__':
-    count = 0
-    cache = make_dataset_cache(img_x_resize=(64,64), img_y_resize=(64,64), invert_color=True)
-    for x_imgs, y_imgs in make_dataset_generator(32, cache, img_x_resize=(64,64), img_y_resize=(64,64), invert_color=True, scale=True):
-        count+= len(x_imgs)
-    print(count)
+    # count = 0
+    # cache = make_dataset_cache(img_x_resize=(64,64), img_y_resize=(64,64), invert_color=True)
+    # for x_imgs, y_imgs in make_dataset_generator(32, cache, img_x_resize=(64,64), img_y_resize=(64,64), invert_color=True, scale=True):
+    #     count+= len(x_imgs)
+    # print(count)
+    make_x_scale('x_path/4_1.jpg', 'x_scale', (128, 128))
 
 

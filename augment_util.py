@@ -42,8 +42,12 @@ def augment_img(x_img, y_img, img_x_resize, img_y_resize, invert_color=False, sc
         y_img= Image.new('L', img_y_resize, (0,) if invert_color else (255,))
 
         if scale_factor >= 1:
-            x_pos = random.randrange(0, scaled_patch_x.width - x_img.width)
-            y_pos = random.randrange(0, scaled_patch_x.width - y_img.width)
+            if scaled_patch_x.width - x_img.width == 0:
+                x_pos = 0
+                y_pos = 0
+            else:
+                x_pos = random.randrange(0, scaled_patch_x.width - x_img.width)
+                y_pos = random.randrange(0, scaled_patch_x.width - y_img.width)
             x_img = scaled_patch_x.crop((x_pos, y_pos, x_img.width+x_pos, x_img.width+y_pos))
             y_img = scaled_patch_y.crop((x_pos, y_pos, x_img.width+x_pos, x_img.width+y_pos))
         else: #random position to paste
