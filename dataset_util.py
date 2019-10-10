@@ -114,7 +114,7 @@ def make_x_scale(sample_fn, save_path, img_x_resize):
 
     for angle in range(0, 360, 30):
         for scale_factor in range(5,12):
-            x_img = Image.open(sample_fn)
+            x_img = Image.open(sample_fn).convert('RGB')
             x_img = rotate(x_img, angle ).resize(img_x_resize)
             if scale_factor == 10:
                 continue
@@ -142,6 +142,6 @@ if __name__ == '__main__':
     # for x_imgs, y_imgs in make_dataset_generator(32, cache, img_x_resize=(64,64), img_y_resize=(64,64), invert_color=True, scale=True):
     #     count+= len(x_imgs)
     # print(count)
-    make_x_scale('x_path/4_1.jpg', 'x_scale', (128, 128))
+    make_x_scale('x_path/8_0.bmp', 'x_scale_2', (128, 128))
 
 
