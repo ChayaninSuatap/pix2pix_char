@@ -280,8 +280,7 @@ def train(dataset_cache, gan, gen, dis, img_x_size, img_y_size, epochs, batch_si
 
     #make patch label
     disc_patch = (int(img_x_size_final[1] / 2**4), int(img_x_size_final[0]/2**4), 1)
-    valid_label = np.ones((batch_size, 1)) if use_binary_validity else np.ones((batch_size,) + disc_patch)
-    fake_label = np.zeros((batch_size, 1)) if use_binary_validity else np.zeros((batch_size,) + disc_patch)
+
 
     d_loss_avgs = []
     g_loss_avgs = []
@@ -302,11 +301,14 @@ def train(dataset_cache, gan, gen, dis, img_x_size, img_y_size, epochs, batch_si
             #train with noisy label
             if noisy_label:
                 #make fake 0.8 - 1, valid = 0.0 - 0.2
-                valid_label = np.full((batch_size, ) + disc_patch, random.uniform(0.0, 0.2))
-                fake_label = np.full((batch_size, ) + disc_patch, random.uniform(0.8, 1.0))
+                valid_label = np.full((len(chrunk[0]), ) + disc_patch, random.uniform(0.0, 0.2))
+                fake_label = np.full((len(chrunk[0]), ) + disc_patch, random.uniform(0.8, 1.0))
                 #20%chance to flip
                 if random.uniform(0.0,1.0) > 0.8:
                     valid_label, fake_label = fake_label, valid_label
+            else:
+                valid_label = np.ones((len(chrunk[0]), 1)) if use_binary_validity else np.ones((len(chrunk[0]),) + disc_patch)
+                fake_label = np.zeros((len(chrunk[0]), 1)) if use_binary_validity else np.zeros((len(chrunk[0]),) + disc_patch)
 
             #set up if predict class
             if predict_class:
