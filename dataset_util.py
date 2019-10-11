@@ -40,7 +40,8 @@ def make_dataset_cache(img_x_resize=(40,40), img_y_resize=(40,40), invert_color=
         img = Image.open(x_path + fn)
         img = img.resize(img_x_resize)
         if invert_color:
-            img = ImageOps.invert(img)
+            img = ImageOps.invert(img.convert('L'))
+            img = img.convert('P')
         label = int(fn[2:-4]) - 1
         x_imgs.append( (img, label))
     

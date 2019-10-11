@@ -428,7 +428,7 @@ if __name__ == '__main__':
         use_generator2=True, use_discriminator2=True,
         gen_dropout=0.5, dis_dropout=0, gan_loss_weights=[1, 100])
     
-    dis.summary()
+    # dis.summary()
     # gen.load_weights('gen128.hdf5')
     # dis.load_weights('dis.hdf5')
 
