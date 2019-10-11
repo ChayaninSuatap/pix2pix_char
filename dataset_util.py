@@ -57,8 +57,14 @@ def make_dataset_cache(img_x_resize=(40,40), img_y_resize=(40,40), invert_color=
 
     return x_imgs, y_imgs
 
-def make_dataset_generator(batch_size, dataset_cache, img_x_resize=(40,40), img_y_resize=(40,40), use_label=False,
+def make_dataset_generator(batch_size, dataset_cache, img_x_resize=(40,40), img_y_resize=(40,40),
+    img_x_resize_final=None, img_y_resize_final=None,
+    use_label=False,
     invert_color=False, augment=True, scale=False):
+
+    if img_x_resize_final is None: img_x_resize_final = img_x_resize
+    if img_y_resize_final is None: img_y_resize_final = img_y_resize
+
     x_imgs, y_imgs = dataset_cache 
     random.shuffle(x_imgs)
 
@@ -82,17 +88,19 @@ def make_dataset_generator(batch_size, dataset_cache, img_x_resize=(40,40), img_
 
         #augment
         if augment:
-            x_img , y_img = augment_img(x_img, y_img, img_x_resize, img_y_resize, invert_color=invert_color, scale=scale)
-        # x_img.show()
-        # y_img.show()
-        # input()
+            x_img , y_img = augment_img(x_img, y_img, img_x_resize, img_y_resize, img_x_resize_final=img_x_resize_final, img_y_resize_final=img_y_resize_final,
+             invert_color=invert_color, scale=scale)
 
+        # input(x_img.size)
        #asarray to normalize
         x_img = np.asarray(x_img) / 127.5 - 1
         y_img = np.asarray(y_img) / 127.5 - 1
+
+        # print('before reshape shape : ',x_img.shape)
+        # input()
         
-        img_x_chrunk.append( x_img.reshape(img_x_resize[0], img_x_resize[1], 1))
-        img_y_chrunk.append( y_img.reshape(img_y_resize[0], img_y_resize[1], 1))
+        img_x_chrunk.append( x_img.reshape(img_x_resize_final[1], img_x_resize_final[0], 1))
+        img_y_chrunk.append( y_img.reshape(img_y_resize_final[1], img_y_resize_final[0], 1))
         label_chrunk.append( label)
         x_img_i += 1
 

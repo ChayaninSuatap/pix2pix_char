@@ -15,10 +15,10 @@ def rotate(img, angle, invert_color=False):
         img = ImageOps.invert(img)
     return img
 
-def augment_img(x_img, y_img, img_x_resize, img_y_resize, invert_color=False, scale=False):
-    #resize
-    x_img = x_img.resize(img_x_resize)
-    y_img = y_img.resize(img_y_resize)
+def augment_img(x_img, y_img, img_x_resize, img_y_resize, img_x_resize_final=None, img_y_resize_final=None, invert_color=False, scale=False):
+    if img_x_resize_final is None: img_x_resize_final = img_x_resize
+    if img_y_resize_final is None: img_y_resize_final = img_y_resize
+
     #flip
     if random.randint(0, 1) == 0:
         x_img = flip_left_right(x_img)
@@ -38,24 +38,30 @@ def augment_img(x_img, y_img, img_x_resize, img_y_resize, invert_color=False, sc
         scaled_patch_y = y_img.resize(scale_size)
         #random where to paste patch
         #create empty image
-        x_img= Image.new('L', img_x_resize, (0,) if invert_color else (255,))
-        y_img= Image.new('L', img_y_resize, (0,) if invert_color else (255,))
+        x_img= Image.new('L', img_x_resize_final, (0,) if invert_color else (255,))
+        y_img= Image.new('L', img_y_resize_final, (0,) if invert_color else (255,))
 
-        if scale_factor >= 1:
-            if scaled_patch_x.width - x_img.width == 0:
-                x_pos = 0
-                y_pos = 0
-            else:
-                x_pos = random.randrange(0, scaled_patch_x.width - x_img.width)
-                y_pos = random.randrange(0, scaled_patch_x.width - y_img.width)
-            x_img = scaled_patch_x.crop((x_pos, y_pos, x_img.width+x_pos, x_img.width+y_pos))
-            y_img = scaled_patch_y.crop((x_pos, y_pos, x_img.width+x_pos, x_img.width+y_pos))
-        else: #random position to paste
-            #random x,y
-            x_pos = random.randrange(0, x_img.width - scaled_patch_x.width)
-            y_pos = random.randrange(0, x_img.width - scaled_patch_x.width)
-            x_img.paste(scaled_patch_x, (x_pos, y_pos))
-            y_img.paste(scaled_patch_y, (x_pos, y_pos))
+        try:
+            x_pos = random.randrange(0, scaled_patch_x.width - x_img.width)
+            x_crop_bound = x_pos + x_img.width
+        except:
+            x_pos = 0
+            x_crop_bound = scaled_patch_x.width
+        try:
+            y_pos = random.randrange(0, scaled_patch_x.height - x_img.height)
+            y_crop_bound = y_pos + x_img.height
+        except:
+            y_pos = 0
+            y_crop_bound = scaled_patch_x.height
+        
+
+        x_crop = scaled_patch_x.crop((x_pos, y_pos, x_crop_bound, y_crop_bound))
+        y_crop = scaled_patch_y.crop((x_pos, y_pos, x_crop_bound, y_crop_bound))
+
+        x_paste_pos = 0 if x_img.width == x_crop.width else random.randrange(0, x_img.width - x_crop.width)
+        y_paste_pos = 0 if x_img.height == x_crop.height else random.randrange(0, x_img.height - x_crop.height)
+        x_img.paste(scaled_patch_x, (x_paste_pos, y_paste_pos))
+        y_img.paste(scaled_patch_y, (x_paste_pos, y_paste_pos))
 
     return x_img, y_img
 

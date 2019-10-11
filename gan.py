@@ -265,17 +265,21 @@ def make_gan(img_x_shape, img_y_shape, init_filters_n=64, dis_dropout=0, gen_dro
     return gan, gen, dis
 
 def train(dataset_cache, gan, gen, dis, img_x_size, img_y_size, epochs, batch_size,
+    img_x_size_final=None, img_y_size_final=None,
     use_label=False, predict_class=False, use_binary_validity=False, invert_color=False,
     label_classes_n=44, augment=True, scale=False, noisy_label=False,
     init_epoch=1,
     save_weights_each_epochs=1,
     save_weights_checkpoint_each_epochs=5,
     save_weights_path=''):
+
     start_time = datetime.datetime.now()
 
+    if img_x_size_final is None : img_x_size_final = img_x_size
+    if img_y_size_final is None : img_y_size_final = img_y_size
+
     #make patch label
-    patch = int(img_x_size[1] / 2**4)
-    disc_patch = (patch, patch, 1)
+    disc_patch = (int(img_x_size_final[1] / 2**4), int(img_x_size_final[0]/2**4), 1)
     valid_label = np.ones((batch_size, 1)) if use_binary_validity else np.ones((batch_size,) + disc_patch)
     fake_label = np.zeros((batch_size, 1)) if use_binary_validity else np.zeros((batch_size,) + disc_patch)
 
@@ -286,8 +290,9 @@ def train(dataset_cache, gan, gen, dis, img_x_size, img_y_size, epochs, batch_si
         d_losses = []
         g_losses = []
         batch_i = 0
-        for chrunk in make_dataset_generator(batch_size, dataset_cache, img_x_size, img_y_size, use_label=use_label,
-            invert_color=invert_color, augment=augment, scale=scale):
+        for chrunk in make_dataset_generator(batch_size, dataset_cache, img_x_size, img_y_size,
+            img_x_resize_final=img_x_size_final, img_y_resize_final=img_y_size_final,
+            use_label=use_label, invert_color=invert_color, augment=augment, scale=scale):
             x_imgs = chrunk[0] 
             y_imgs = chrunk[1]
             if use_label:
@@ -371,7 +376,7 @@ def train(dataset_cache, gan, gen, dis, img_x_size, img_y_size, epochs, batch_si
             dis.save_weights(save_weights_path + 'dis.backup.hdf5')
             print('\nmodel saved')
 
-            _sample_test(gen, img_x_size, epoch, save_weights_path, use_label=use_label, invert_color=invert_color)
+            _sample_test(gen, img_x_size_final, epoch, save_weights_path, use_label=use_label, invert_color=invert_color)
         
         if epoch % save_weights_checkpoint_each_epochs == 0:
             gen.save_weights(save_weights_path + 'gen%d.hdf5' % (epoch))
@@ -381,13 +386,13 @@ def _sample_test(gen, img_x_size, epoch=0, save_sample_plot_path='', use_label=F
     x_imgs, labels = load_sample_data(img_x_size, invert_color=invert_color)
     preds = []
     for x_img, label in zip(x_imgs, labels):
-        reshaped = np.asarray([x_img]).reshape(1,img_x_size[0], img_x_size[1], 1)
+        reshaped = np.asarray([x_img]).reshape(1,img_x_size[1], img_x_size[0], 1)
         if use_label:
             pred = gen.predict([reshaped, np.asarray([label])])
         elif not use_label:
             pred = gen.predict(reshaped)
         pred = 1 - (pred * 0.5 + 0.5) if invert_color else (pred * 0.5 - 0.5)
-        preds.append(pred[0].reshape(img_x_size[0], img_x_size[1]))
+        preds.append(pred[0].reshape(img_x_size[1], img_x_size[0]))
     
     fig, axs = plt.subplots(2, len(x_imgs))
 
@@ -419,19 +424,22 @@ def predict(gen, img_size, x_path, y_path, invert_color=False):
 if __name__ == '__main__':
     dataset_cache = make_dataset_cache((128, 128), (128, 128), invert_color=True)
 
-    gan, gen, dis = make_gan(img_x_shape=(128, 128, 1), img_y_shape=(128, 128, 1), init_filters_n = 128, filter_size=4,
+    gan, gen, dis = make_gan(img_x_shape=(256, 128, 1), img_y_shape=(256, 128, 1), init_filters_n = 64, filter_size=4,
         use_generator2=True, use_discriminator2=True,
         gen_dropout=0.5, dis_dropout=0, gan_loss_weights=[1, 100])
-
-    gen.load_weights('gen128.hdf5')
+    
+    dis.summary()
+    # gen.load_weights('gen128.hdf5')
     # dis.load_weights('dis.hdf5')
 
-    # train(dataset_cache, gan, gen, dis, img_x_size=(128, 128), img_y_size=(128, 128), init_epoch=1, noisy_label=False,
-        # augment=True, scale=False,
-        # epochs=9999, batch_size=1, save_weights_each_epochs=1, save_weights_checkpoint_each_epochs=9999)
+    train(dataset_cache, gan, gen, dis, img_x_size=(128, 128), img_y_size=(128, 128),
+        img_x_size_final=(128, 256), img_y_size_final=(128, 256),
+        init_epoch=1,
+        scale=True, invert_color=True,
+        epochs=9999, batch_size=1, save_weights_each_epochs=2, save_weights_checkpoint_each_epochs=9999)
 
 
-    predict(gen, img_size=(128,128), x_path='x_unknown_fronts/', y_path='y_unknown_fronts/', invert_color=True)
+    # predict(gen, img_size=(128,128), x_path='x_unknown_fronts/', y_path='y_unknown_fronts/', invert_color=True)
 
     # _sample_test(gen, img_x_size=(128,128), invert_color=True)
 
