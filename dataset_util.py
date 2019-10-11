@@ -142,6 +142,6 @@ if __name__ == '__main__':
     # for x_imgs, y_imgs in make_dataset_generator(32, cache, img_x_resize=(64,64), img_y_resize=(64,64), invert_color=True, scale=True):
     #     count+= len(x_imgs)
     # print(count)
-    make_x_scale('x_path/8_0.bmp', 'x_scale_2', (128, 128))
+    make_x_scale('x_path/10_0.bmp', 'x_scale_4', (128, 128))
 
 

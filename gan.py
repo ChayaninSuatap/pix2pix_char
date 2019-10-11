@@ -419,11 +419,11 @@ def predict(gen, img_size, x_path, y_path, invert_color=False):
 if __name__ == '__main__':
     dataset_cache = make_dataset_cache((128, 128), (128, 128), invert_color=True)
 
-    gan, gen, dis = make_gan(img_x_shape=(128, 128, 1), img_y_shape=(128, 128, 1), init_filters_n = 64, filter_size=4,
+    gan, gen, dis = make_gan(img_x_shape=(128, 128, 1), img_y_shape=(128, 128, 1), init_filters_n = 128, filter_size=4,
         use_generator2=True, use_discriminator2=True,
         gen_dropout=0.5, dis_dropout=0, gan_loss_weights=[1, 100])
 
-    gen.load_weights('gen.hdf5')
+    gen.load_weights('gen128.hdf5')
     # dis.load_weights('dis.hdf5')
 
     # train(dataset_cache, gan, gen, dis, img_x_size=(128, 128), img_y_size=(128, 128), init_epoch=1, noisy_label=False,
@@ -431,7 +431,8 @@ if __name__ == '__main__':
         # epochs=9999, batch_size=1, save_weights_each_epochs=1, save_weights_checkpoint_each_epochs=9999)
 
 
-    predict(gen, img_size=(128,128), x_path='x_scale_2/', y_path='y_scale_2/', invert_color=True)
+    predict(gen, img_size=(128,128), x_path='x_unknown_fronts/', y_path='y_unknown_fronts/', invert_color=True)
+
     # _sample_test(gen, img_x_size=(128,128), invert_color=True)
 
         
