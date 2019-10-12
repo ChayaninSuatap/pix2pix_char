@@ -99,7 +99,7 @@ def make_discriminator2(img_x_shape, img_y_shape, init_filters_n=64):
 
     return Model([input_x_layer, input_y_layer], ly)
 
-def make_generator2(img_shape, init_filters_n=64, dropout_rate=None):
+def make_generator2(img_shape, init_filters_n=64, dropout_rate=None, deep_gen=False):
     init = RandomNormal(stddev=0.02)
 
     def encoder(layer_in, filters, f_size=4, bn=True):
@@ -124,19 +124,33 @@ def make_generator2(img_shape, init_filters_n=64, dropout_rate=None):
     e2 = encoder(e1, init_filters_n * 2)
     e3 = encoder(e2, init_filters_n * 4)
     e4 = encoder(e3, init_filters_n * 8)
+    last_encoder_ly = e4
+
+    if deep_gen:
+        e5 = encoder(e4, init_filters_n * 8)
+        last_encoder_ly = e5
 
     #bottleneck
-    b = Conv2D(init_filters_n * 8, (4,4), strides=(2,2), padding='same', kernel_initializer=init)(e4)
+    b = Conv2D(init_filters_n * 8, (4,4), strides=(2,2), padding='same', kernel_initializer=init)(last_encoder_ly)
     b = Activation('relu')(b)
 
     #decoder
-    d1 = decoder(b, e4, init_filters_n * 8)
-    d2 = decoder(d1, e3, init_filters_n *4)
-    d3 = decoder(d2, e2, init_filters_n *2, dropout_rate=dropout_rate)
-    d4 = decoder(d3, e1, init_filters_n, dropout_rate=dropout_rate)
+    if deep_gen:
+        d1 = decoder(b, e5, init_filters_n * 8)
+        d2 = decoder(d1, e4, init_filters_n * 8)
+        d3 = decoder(d2, e3, init_filters_n *4, dropout_rate=dropout_rate)
+        d4 = decoder(d3, e2, init_filters_n *2, dropout_rate=dropout_rate)
+        d5 = decoder(d4, e1, init_filters_n, dropout_rate=dropout_rate)
+        last_decoder_ly = d5
+    else:
+        d1 = decoder(b, e4, init_filters_n * 8)
+        d2 = decoder(d1, e3, init_filters_n *4)
+        d3 = decoder(d2, e2, init_filters_n *2, dropout_rate=dropout_rate)
+        d4 = decoder(d3, e1, init_filters_n, dropout_rate=dropout_rate)
+        last_decoder_ly = d4
 
     #output
-    o = Conv2DTranspose(1, (4,4), strides=(2,2), padding='same', kernel_initializer=init)(d4)
+    o = Conv2DTranspose(1, (4,4), strides=(2,2), padding='same', kernel_initializer=init)(last_decoder_ly)
     o = Activation('tanh')(o)        
 
     return Model(input_layer, o)
@@ -197,7 +211,7 @@ def make_gan(img_x_shape, img_y_shape, init_filters_n=64, dis_dropout=0, gen_dro
     use_label=False, label_embed_size=50, label_classes_n=None, predict_class=False,
     filter_size=4, use_binary_validity=False, binary_validity_dropout_rate=0,
     gan_loss_weights=None, use_generator2=False, use_discriminator2=False,
-    gen_init_filters_n=None, dis_init_filters_n=None):
+    gen_init_filters_n=None, dis_init_filters_n=None, deep_gen=False):
     optimizer = Adam(0.0002, 0.5)
 
     #discriminator
@@ -226,7 +240,7 @@ def make_gan(img_x_shape, img_y_shape, init_filters_n=64, dis_dropout=0, gen_dro
             use_label=use_label, label_embed_size=label_embed_size,
             label_classes_n=label_classes_n, filter_size=filter_size)
     else:
-        gen = make_generator2(img_y_shape, init_filters_n=gen_filters, dropout_rate=gen_dropout)
+        gen = make_generator2(img_y_shape, init_filters_n=gen_filters, dropout_rate=gen_dropout, deep_gen=deep_gen)
 
     image_input_layer = Input(shape=img_x_shape)
     if use_label:
@@ -427,9 +441,10 @@ if __name__ == '__main__':
     dataset_cache = make_dataset_cache((128, 128), (128, 128), invert_color=True)
 
     gan, gen, dis = make_gan(img_x_shape=(256, 128, 1), img_y_shape=(256, 128, 1), init_filters_n = 64, filter_size=4,
-        use_generator2=True, use_discriminator2=True,
+        use_generator2=True, use_discriminator2=True, deep_gen = True,
         gen_dropout=0.5, dis_dropout=0, gan_loss_weights=[1, 100])
     
+    # gen.summary()
     # dis.summary()
     # gen.load_weights('gen128.hdf5')
     # dis.load_weights('dis.hdf5')

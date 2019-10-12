@@ -92,7 +92,11 @@ def make_dataset_generator(batch_size, dataset_cache, img_x_resize=(40,40), img_
             x_img , y_img = augment_img(x_img, y_img, img_x_resize, img_y_resize, img_x_resize_final=img_x_resize_final, img_y_resize_final=img_y_resize_final,
              invert_color=invert_color, scale=scale)
 
-        # input(x_img.size)
+        #check img
+        # check_img_fn = str(random.randint(0,999999))
+        # x_img.save('check_img/' + check_img_fn + 'x.jpg')
+        # y_img.save('check_img/' + check_img_fn + 'y.jpg')
+        
        #asarray to normalize
         x_img = np.asarray(x_img) / 127.5 - 1
         y_img = np.asarray(y_img) / 127.5 - 1
