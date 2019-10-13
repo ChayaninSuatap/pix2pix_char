@@ -124,33 +124,25 @@ def make_generator2(img_shape, init_filters_n=64, dropout_rate=None, deep_gen=Fa
     e2 = encoder(e1, init_filters_n * 2)
     e3 = encoder(e2, init_filters_n * 4)
     e4 = encoder(e3, init_filters_n * 8)
-    last_encoder_ly = e4
-
-    if deep_gen:
-        e5 = encoder(e4, init_filters_n * 8)
-        last_encoder_ly = e5
+    e5 = encoder(e4, init_filters_n * 8)
+    e6 = encoder(e5, init_filters_n * 8)
+    e7 = encoder(e6, init_filters_n * 8)
 
     #bottleneck
-    b = Conv2D(init_filters_n * 8, (4,4), strides=(2,2), padding='same', kernel_initializer=init)(last_encoder_ly)
+    b = Conv2D(init_filters_n * 8, (4,4), strides=(2,2), padding='same', kernel_initializer=init)(e7)
     b = Activation('relu')(b)
 
     #decoder
-    if deep_gen:
-        d1 = decoder(b, e5, init_filters_n * 8, dropout_rate=dropout_rate)
-        d2 = decoder(d1, e4, init_filters_n * 8,dropout_rate=dropout_rate)
-        d3 = decoder(d2, e3, init_filters_n *4)
-        d4 = decoder(d3, e2, init_filters_n *2)
-        d5 = decoder(d4, e1, init_filters_n)
-        last_decoder_ly = d5
-    else:
-        d1 = decoder(b, e4, init_filters_n * 8, dropout_rate=dropout_rate)
-        d2 = decoder(d1, e3, init_filters_n *4, dropout_rate=dropout_rate)
-        d3 = decoder(d2, e2, init_filters_n *2)
-        d4 = decoder(d3, e1, init_filters_n)
-        last_decoder_ly = d4
+    d1 = decoder(b,  e7, init_filters_n * 8, dropout_rate=dropout_rate)
+    d2 = decoder(d1, e6, init_filters_n * 8, dropout_rate=dropout_rate)
+    d3 = decoder(d2, e5, init_filters_n * 8, dropout_rate=dropout_rate)
+    d4 = decoder(d3, e4, init_filters_n * 8)
+    d5 = decoder(d4, e3, init_filters_n * 4)
+    d6 = decoder(d5, e2, init_filters_n * 2)
+    d7 = decoder(d6, e1, init_filters_n)
 
     #output
-    o = Conv2DTranspose(1, (4,4), strides=(2,2), padding='same', kernel_initializer=init)(last_decoder_ly)
+    o = Conv2DTranspose(1, (4,4), strides=(2,2), padding='same', kernel_initializer=init)(d7)
     o = Activation('tanh')(o)        
 
     return Model(input_layer, o)
@@ -440,24 +432,24 @@ def predict(gen, img_size, x_path, y_path, invert_color=False):
 if __name__ == '__main__':
     dataset_cache = make_dataset_cache((128, 128), (128, 128), invert_color=True)
 
-    gan, gen, dis = make_gan(img_x_shape=(128, 128, 1), img_y_shape=(128, 128, 1), init_filters_n = 128, filter_size=4,
+    gan, gen, dis = make_gan(img_x_shape=(256, 256, 1), img_y_shape=(256, 256, 1), init_filters_n = 64, filter_size=4,
         use_generator2=True, use_discriminator2=True, deep_gen = False,
         gen_dropout=0.5, dis_dropout=0, gan_loss_weights=[1, 100])
     
-    # gen.summary()
+    gen.summary()
     # dis.summary()
-    gen.load_weights('gen128.hdf5')
+    # gen.load_weights('gen128.hdf5')
     # dis.load_weights('dis.hdf5')
     # input()
 
-    # train(dataset_cache, gan, gen, dis, img_x_size=(128, 128), img_y_size=(128, 128),
-        # img_x_size_final=(128, 256), img_y_size_final=(128, 256),
-        # init_epoch=1,
-        # scale=True, invert_color=True,
-        # epochs=9999, batch_size=1, save_weights_each_epochs=2, save_weights_checkpoint_each_epochs=9999)
+    train(dataset_cache, gan, gen, dis, img_x_size=(128, 128), img_y_size=(128, 128),
+        img_x_size_final=(256, 256), img_y_size_final=(256, 256),
+        init_epoch=1,
+        scale=True, invert_color=True,
+        epochs=9999, batch_size=1, save_weights_each_epochs=2, save_weights_checkpoint_each_epochs=9999)
 
 
-    predict(gen, img_size=(128,128), x_path='check_img/', y_path='y_path/', invert_color=True)
+    # predict(gen, img_size=(128,128), x_path='check_img/', y_path='y_path/', invert_color=True)
 
     # _sample_test(gen, img_x_size=(128,128), invert_color=True)
 
