@@ -136,17 +136,17 @@ def make_generator2(img_shape, init_filters_n=64, dropout_rate=None, deep_gen=Fa
 
     #decoder
     if deep_gen:
-        d1 = decoder(b, e5, init_filters_n * 8)
-        d2 = decoder(d1, e4, init_filters_n * 8)
-        d3 = decoder(d2, e3, init_filters_n *4, dropout_rate=dropout_rate)
-        d4 = decoder(d3, e2, init_filters_n *2, dropout_rate=dropout_rate)
-        d5 = decoder(d4, e1, init_filters_n, dropout_rate=dropout_rate)
+        d1 = decoder(b, e5, init_filters_n * 8, dropout_rate=dropout_rate)
+        d2 = decoder(d1, e4, init_filters_n * 8,dropout_rate=dropout_rate)
+        d3 = decoder(d2, e3, init_filters_n *4)
+        d4 = decoder(d3, e2, init_filters_n *2)
+        d5 = decoder(d4, e1, init_filters_n)
         last_decoder_ly = d5
     else:
-        d1 = decoder(b, e4, init_filters_n * 8)
-        d2 = decoder(d1, e3, init_filters_n *4)
-        d3 = decoder(d2, e2, init_filters_n *2, dropout_rate=dropout_rate)
-        d4 = decoder(d3, e1, init_filters_n, dropout_rate=dropout_rate)
+        d1 = decoder(b, e4, init_filters_n * 8, dropout_rate=dropout_rate)
+        d2 = decoder(d1, e3, init_filters_n *4, dropout_rate=dropout_rate)
+        d3 = decoder(d2, e2, init_filters_n *2)
+        d4 = decoder(d3, e1, init_filters_n)
         last_decoder_ly = d4
 
     #output
@@ -445,9 +445,10 @@ if __name__ == '__main__':
         gen_dropout=0.5, dis_dropout=0, gan_loss_weights=[1, 100])
     
     # gen.summary()
-    # dis.summary()
+    dis.summary()
     # gen.load_weights('gen128.hdf5')
     # dis.load_weights('dis.hdf5')
+    input()
 
     train(dataset_cache, gan, gen, dis, img_x_size=(128, 128), img_y_size=(128, 128),
         img_x_size_final=(128, 256), img_y_size_final=(128, 256),
