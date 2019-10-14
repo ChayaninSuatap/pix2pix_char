@@ -69,7 +69,7 @@ def make_discriminator(img_x_shape, img_y_shape, dropout=0, init_filters_n=64,
         model =  Model([img_X, img_Y], dis_output)
     return model
 
-def make_discriminator2(img_x_shape, img_y_shape, init_filters_n=64):
+def make_discriminator2(img_x_shape, img_y_shape, init_filters_n=64, use_binary_validity=False):
     def conv2d(layer_in, filters, f_size=4, bn=True):
         ly = Conv2D(filters, f_size, strides=(2,2), padding='same', kernel_initializer=init)(layer_in)
         if bn:
@@ -95,7 +95,12 @@ def make_discriminator2(img_x_shape, img_y_shape, init_filters_n=64):
     ly = LeakyReLU(alpha=0.2)(ly)
 
     #patch output
-    ly = Conv2D(1, (4,4), activation='sigmoid', padding='same', kernel_initializer=init)(ly)
+    if not use_binary_validity:
+        ly = Conv2D(1, (4,4), activation='sigmoid', padding='same', kernel_initializer=init)(ly)
+    else:
+        ly = Flatten()(ly)
+        ly = Dense(1, activation='sigmoid', name='dis_valid_binary')(ly)
+
 
     return Model([input_x_layer, input_y_layer], ly)
 
@@ -214,7 +219,7 @@ def make_gan(img_x_shape, img_y_shape, init_filters_n=64, dis_dropout=0, gen_dro
             label_classes_n=label_classes_n, predict_class=predict_class,
             use_binary_validity=use_binary_validity, binary_validity_dropout_rate=binary_validity_dropout_rate)
     else:
-        dis = make_discriminator2(img_x_shape, img_y_shape, init_filters_n=dis_filters)
+        dis = make_discriminator2(img_x_shape, img_y_shape, init_filters_n=dis_filters, use_binary_validity=use_binary_validity)
     
     dis_validity_loss = 'binary_crossentropy'
 
@@ -286,7 +291,6 @@ def train(dataset_cache, gan, gen, dis, img_x_size, img_y_size, epochs, batch_si
 
     #make patch label
     disc_patch = (int(img_x_size_final[1] / 2**4), int(img_x_size_final[0]/2**4), 1)
-
 
     d_loss_avgs = []
     g_loss_avgs = []
@@ -432,8 +436,8 @@ def predict(gen, img_size, x_path, y_path, invert_color=False):
 if __name__ == '__main__':
     dataset_cache = make_dataset_cache((128, 128), (128, 128), invert_color=True)
 
-    gan, gen, dis = make_gan(img_x_shape=(256, 256, 1), img_y_shape=(256, 256, 1), init_filters_n = 64, filter_size=4,
-        use_generator2=True, use_discriminator2=True, deep_gen = False,
+    gan, gen, dis = make_gan(img_x_shape=(256, 256, 1), img_y_shape=(256, 256, 1), init_filters_n = 32, filter_size=4,
+        use_generator2=True, use_discriminator2=True, use_binary_validity=True,
         gen_dropout=0.5, dis_dropout=0, gan_loss_weights=[1, 100])
     
     gen.summary()
@@ -444,6 +448,7 @@ if __name__ == '__main__':
 
     train(dataset_cache, gan, gen, dis, img_x_size=(128, 128), img_y_size=(128, 128),
         img_x_size_final=(256, 256), img_y_size_final=(256, 256),
+        use_binary_validity=True,
         init_epoch=1,
         scale=True, invert_color=True,
         epochs=9999, batch_size=1, save_weights_each_epochs=2, save_weights_checkpoint_each_epochs=9999)
