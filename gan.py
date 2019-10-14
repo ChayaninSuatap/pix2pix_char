@@ -69,7 +69,7 @@ def make_discriminator(img_x_shape, img_y_shape, dropout=0, init_filters_n=64,
         model =  Model([img_X, img_Y], dis_output)
     return model
 
-def make_discriminator2(img_x_shape, img_y_shape, init_filters_n=64, use_binary_validity=False, dropout_rate=None):
+def make_discriminator2(img_x_shape, img_y_shape, init_filters_n=64, use_binary_validity=False, dropout_rate=None, f_size=4):
     def conv2d(layer_in, filters, f_size=4, bn=True, dropout_rate=None):
         ly = Conv2D(filters, f_size, strides=(2,2), padding='same', kernel_initializer=init)(layer_in)
         if bn:
@@ -84,19 +84,19 @@ def make_discriminator2(img_x_shape, img_y_shape, init_filters_n=64, use_binary_
     input_merged_layer = Concatenate()([input_x_layer, input_y_layer])
 
     #conv
-    ly = conv2d(input_merged_layer, init_filters_n, bn=False)
-    ly = conv2d(ly, init_filters_n * 2)
-    ly = conv2d(ly, init_filters_n * 4)
-    ly = conv2d(ly, init_filters_n * 8)
+    ly = conv2d(input_merged_layer, init_filters_n, bn=False, f_size=f_size)
+    ly = conv2d(ly, init_filters_n * 2, f_size=f_size)
+    ly = conv2d(ly, init_filters_n * 4, f_size=f_size)
+    ly = conv2d(ly, init_filters_n * 8, f_size=f_size)
 
     #second last layer
-    ly = Conv2D(init_filters_n * 8, (4,4), padding='same', kernel_initializer=init)(ly)
+    ly = Conv2D(init_filters_n * 8, f_size, padding='same', kernel_initializer=init)(ly)
     ly = BatchNormalization()(ly)
     ly = LeakyReLU(alpha=0.2)(ly)
 
     #patch output
     if not use_binary_validity:
-        ly = Conv2D(1, (4,4), activation='sigmoid', padding='same', kernel_initializer=init)(ly)
+        ly = Conv2D(1, f_size, activation='sigmoid', padding='same', kernel_initializer=init)(ly)
     else:
         if dropout_rate:
             ly = Dropout(dropout_rate)(ly)
@@ -106,7 +106,7 @@ def make_discriminator2(img_x_shape, img_y_shape, init_filters_n=64, use_binary_
 
     return Model([input_x_layer, input_y_layer], ly)
 
-def make_generator2(img_shape, init_filters_n=64, dropout_rate=None, deep_gen=False):
+def make_generator2(img_shape, init_filters_n=64, dropout_rate=None, deep_gen=False, f_size=4):
     init = RandomNormal(stddev=0.02)
 
     def encoder(layer_in, filters, f_size=4, bn=True):
@@ -127,29 +127,29 @@ def make_generator2(img_shape, init_filters_n=64, dropout_rate=None, deep_gen=Fa
     
     #encoder
     input_layer = Input(shape=img_shape)
-    e1 = encoder(input_layer, init_filters_n, bn=False) 
-    e2 = encoder(e1, init_filters_n * 2)
-    e3 = encoder(e2, init_filters_n * 4)
-    e4 = encoder(e3, init_filters_n * 8)
-    e5 = encoder(e4, init_filters_n * 8)
-    e6 = encoder(e5, init_filters_n * 8)
-    e7 = encoder(e6, init_filters_n * 8)
+    e1 = encoder(input_layer, init_filters_n, bn=False, f_size=f_size) 
+    e2 = encoder(e1, init_filters_n * 2, f_size=f_size)
+    e3 = encoder(e2, init_filters_n * 4, f_size=f_size)
+    e4 = encoder(e3, init_filters_n * 8, f_size=f_size)
+    e5 = encoder(e4, init_filters_n * 8, f_size=f_size)
+    e6 = encoder(e5, init_filters_n * 8, f_size=f_size)
+    e7 = encoder(e6, init_filters_n * 8, f_size=f_size)
 
     #bottleneck
-    b = Conv2D(init_filters_n * 8, (4,4), strides=(2,2), padding='same', kernel_initializer=init)(e7)
+    b = Conv2D(init_filters_n * 8, f_size, strides=(2,2), padding='same', kernel_initializer=init)(e7)
     b = Activation('relu')(b)
 
     #decoder
-    d1 = decoder(b,  e7, init_filters_n * 8, dropout_rate=dropout_rate)
-    d2 = decoder(d1, e6, init_filters_n * 8, dropout_rate=dropout_rate)
-    d3 = decoder(d2, e5, init_filters_n * 8, dropout_rate=dropout_rate)
-    d4 = decoder(d3, e4, init_filters_n * 8)
-    d5 = decoder(d4, e3, init_filters_n * 4)
-    d6 = decoder(d5, e2, init_filters_n * 2)
-    d7 = decoder(d6, e1, init_filters_n)
+    d1 = decoder(b,  e7, init_filters_n * 8, dropout_rate=dropout_rate, f_size=f_size)
+    d2 = decoder(d1, e6, init_filters_n * 8, dropout_rate=dropout_rate, f_size=f_size)
+    d3 = decoder(d2, e5, init_filters_n * 8, dropout_rate=dropout_rate, f_size=f_size)
+    d4 = decoder(d3, e4, init_filters_n * 8, f_size=f_size)
+    d5 = decoder(d4, e3, init_filters_n * 4, f_size=f_size)
+    d6 = decoder(d5, e2, init_filters_n * 2, f_size=f_size)
+    d7 = decoder(d6, e1, init_filters_n, f_size=f_size)
 
     #output
-    o = Conv2DTranspose(1, (4,4), strides=(2,2), padding='same', kernel_initializer=init)(d7)
+    o = Conv2DTranspose(1, f_size, strides=(2,2), padding='same', kernel_initializer=init)(d7)
     o = Activation('tanh')(o)        
 
     return Model(input_layer, o)
@@ -221,7 +221,8 @@ def make_gan(img_x_shape, img_y_shape, init_filters_n=64, dis_dropout=0, gen_dro
             label_classes_n=label_classes_n, predict_class=predict_class,
             use_binary_validity=use_binary_validity, binary_validity_dropout_rate=binary_validity_dropout_rate)
     else:
-        dis = make_discriminator2(img_x_shape, img_y_shape, init_filters_n=dis_filters, use_binary_validity=use_binary_validity, dropout_rate = dis_dropout)
+        dis = make_discriminator2(img_x_shape, img_y_shape, init_filters_n=dis_filters,
+        use_binary_validity=use_binary_validity, dropout_rate = dis_dropout, f_size=filter_size)
     
     dis_validity_loss = 'binary_crossentropy'
 
@@ -438,9 +439,9 @@ def predict(gen, img_size, x_path, y_path, invert_color=False):
 if __name__ == '__main__':
     dataset_cache = make_dataset_cache((128, 128), (128, 128), invert_color=True)
 
-    gan, gen, dis = make_gan(img_x_shape=(256, 256, 1), img_y_shape=(256, 256, 1), init_filters_n = 64, filter_size=4,
+    gan, gen, dis = make_gan(img_x_shape=(256, 256, 1), img_y_shape=(256, 256, 1), init_filters_n = 64, filter_size=3,
         use_generator2=True, use_discriminator2=True, use_binary_validity=True,
-        gen_dropout=0.5, dis_dropout=0.25, gan_loss_weights=[1, 100])
+        gen_dropout=0.5, dis_dropout=0, gan_loss_weights=[1, 100])
     
     gen.summary()
     # dis.summary()
